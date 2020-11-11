@@ -11,6 +11,7 @@
   "main": "index.js",
   "gypfile": true,
   "scripts": {
+    "preinstall": "node-pre-gyp configure",
     "build": "node-pre-gyp build",
     "install": "node-pre-gyp build package",
     "clean": "node-pre-gyp clean"
