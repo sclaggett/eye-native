@@ -13,10 +13,10 @@
     ],
     'include_dirs': [
       "<!@(node -p \"require('node-addon-api').include\")",
-      "/usr/local/opt/opencv@3/include",
+      "opencv/mac/include/",
     ],
     'library_dirs': [
-      "/usr/local/opt/opencv@3/lib",
+      "../opencv/mac/lib/",
     ],
     'libraries': [
       "-lopencv_core",
