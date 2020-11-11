@@ -1,6 +1,6 @@
 {
   "targets": [{
-    "target_name": "eyenative",
+    "target_name": "<(module_name)",
     "cflags!": [ "-fno-exceptions" ],
     "cflags_cc!": [ "-fno-exceptions" ],
     "sources": [
@@ -11,12 +11,9 @@
       "src/PipeReader.cpp",
       "src/Thread.cpp",
     ],
+    'product_dir': '<(module_path)',
     'include_dirs': [
       "<!@(node -p \"require('node-addon-api').include\")",
-      "opencv/mac/include/",
-    ],
-    'library_dirs': [
-      "../opencv/mac/lib/",
     ],
     'libraries': [
       "-lopencv_core",
@@ -27,6 +24,27 @@
     'dependencies': [
       "<!(node -p \"require('node-addon-api').gyp\")"
     ],
-    'defines': [ 'NAPI_DISABLE_CPP_EXCEPTIONS' ]
+    'defines': [ 'NAPI_DISABLE_CPP_EXCEPTIONS' ],
+    'conditions': [
+      ['OS=="linux"', {
+        'include_dirs': [],
+        'library_dirs': []
+      }],
+      ['OS=="mac"', {
+        'include_dirs': [
+          "opencv/mac/include/"
+        ],
+        'library_dirs': [
+          "../opencv/mac/lib/"
+        ],
+        'xcode_settings': {
+          "MACOSX_DEPLOYMENT_TARGET": "10.15"
+        }
+      }],
+      ['OS=="win"', {
+        'include_dirs': [],
+        'library_dirs': []
+      }],
+    ],
   }]
 }
