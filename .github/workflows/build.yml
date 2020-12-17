@@ -24,4 +24,5 @@ jobs:
         run: |
           yarn --frozen-lockfile
           yarn github-publish
-          
+        env:
+          NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
