@@ -23,3 +23,5 @@ jobs:
       - name: yarn
         run: |
           yarn --frozen-lockfile
+          yarn github-publish
+          

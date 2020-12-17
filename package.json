@@ -1,6 +1,6 @@
 {
   "name": "eye-native",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "",
   "author": "",
   "license": "UNLICENSED",
@@ -14,7 +14,8 @@
     "install": "node-pre-gyp configure build package",
     "build": "node-pre-gyp build",
     "rebuild": "node-pre-gyp rebuild",
-    "clean": "node-pre-gyp clean"
+    "clean": "node-pre-gyp clean",
+    "github-publish": "node-pre-gyp-github publish"
   },
   "devDependencies": {
     "node-gyp": "^3.7.0"
