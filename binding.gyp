@@ -7,9 +7,10 @@
       "src/FrameThread.cpp",
       "src/FfmpegProcess.cpp",
       "src/main.cpp",
-      "src/NativeWrapper.cpp",
+      "src/Native.cpp",
       "src/PipeReader.cpp",
       "src/Thread.cpp",
+      "src/Wrapper.cpp",
     ],
     'product_dir': '<(module_path)',
     'include_dirs': [

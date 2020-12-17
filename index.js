@@ -1,4 +1,6 @@
-// const native = require('./build/Release/native.node');
+// index.js: This code is the JavaScript bridge between the functions that this
+// module exports and the C++ wrapper defined in Wrapper.h.
+
 const native = require('bindings')('eyenative');
 
 function initialize(ffmpegPath) {
