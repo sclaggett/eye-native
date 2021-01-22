@@ -1,6 +1,6 @@
 {
   "targets": [{
-    "target_name": "<(module_name)",
+    "target_name": "eyenative",
     "cflags!": [ "-fno-exceptions" ],
     "cflags_cc!": [ "-fno-exceptions" ],
     "sources": [
@@ -12,7 +12,7 @@
       "src/Thread.cpp",
       "src/Wrapper.cpp",
     ],
-    'product_dir': '<(module_path)',
+    'product_dir': 'build/Release/',
     'include_dirs': [
       "<!@(node -p \"require('node-addon-api').include\")",
     ],
