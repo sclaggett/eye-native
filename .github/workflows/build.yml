@@ -23,6 +23,6 @@ jobs:
       - name: yarn
         run: |
           yarn --frozen-lockfile
-          yarn github-publish
+          yarn build
         env:
           NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
