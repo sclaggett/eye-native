@@ -1,10 +1,12 @@
 #pragma once
 
+#include <mutex>
 #include "FfmpegProcess.h"
 #include "Thread.h"
 #include "Queue.hpp"
 
-typedef struct {
+typedef struct
+{
   uint8_t* frame;
   size_t length;
   uint32_t width;
@@ -22,10 +24,14 @@ public:
 
   void* run();
 
+  void setPreviewChannel(std::string channelName);
+
 private:
   std::shared_ptr<FfmpegProcess> ffmpegProcess;
   std::shared_ptr<Queue<FrameWrapper*>> pendingFrameQueue;
   std::shared_ptr<Queue<FrameWrapper*>> completedFrameQueue;
   uint32_t width;
   uint32_t height;
+  std::string previewChannelName;
+  std::mutex previewChannelMutex;
 };

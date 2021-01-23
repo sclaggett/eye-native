@@ -3,6 +3,9 @@
 #include "FrameThread.h"
 #include "Wrapper.h"
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 using namespace std;
 
@@ -15,14 +18,14 @@ shared_ptr<Queue<FrameWrapper*>> gCompletedFrameQueue(new Queue<FrameWrapper*>()
 shared_ptr<FfmpegProcess> gFfmpegProcess(nullptr);
 shared_ptr<FrameThread> gFrameThread(nullptr);
 
-void native::initialize(Napi::Env env, string ffmpegPath)
+void native::initializeFfmpeg(Napi::Env env, string ffmpegPath)
 {
   // Remember the location of ffmpeg
   gFfmpegPath = ffmpegPath;
   gInitialized = true;
 }
 
-string native::open(Napi::Env env, int width, int height, int fps, string encoder,
+string native::createVideoOutput(Napi::Env env, int width, int height, int fps, string encoder,
   string outputPath)
 {
   // Make sure we've been initialized and aren't currently recording
@@ -52,7 +55,7 @@ string native::open(Napi::Env env, int width, int height, int fps, string encode
   return "";
 }
 
-int32_t native::write(Napi::Env env, uint8_t* frame, size_t length, int width,
+int32_t native::queueNextFrame(Napi::Env env, uint8_t* frame, size_t length, int width,
   int height)
 {
   // Make sure we've been initialized and are recording
@@ -76,7 +79,7 @@ int32_t native::write(Napi::Env env, uint8_t* frame, size_t length, int width,
   return wrapper->id;
 }
 
-vector<int32_t> native::checkCompleted(Napi::Env env)
+vector<int32_t> native::checkCompletedFrames(Napi::Env env)
 {
   // Return an array of all frames that we're done with and free the associated memory
   vector<int32_t> ret;
@@ -89,9 +92,8 @@ vector<int32_t> native::checkCompleted(Napi::Env env)
   return ret;
 }
 
-void native::close(Napi::Env env)
+void native::closeVideoOutput(Napi::Env env)
 {
-  printf("## Closing\n");
   if (!gRecording)
   {
     return;
@@ -113,4 +115,52 @@ void native::close(Napi::Env env)
     gFfmpegProcess = nullptr;
   }
   gRecording = false;
+}
+
+string native::createPreviewChannel(Napi::Env env, string& channelName)
+{
+  // Pass the preview channel name to the frame thread
+  if (gFrameThread == nullptr)
+  {
+    return "Create video output before preview channel";
+  }
+
+  // Create a temporary file
+  char nameBuffer[128];
+  snprintf(nameBuffer, 128, "/tmp/eyeNativeXXXXXX");
+  int tmpFd = mkstemp(nameBuffer);
+  if (tmpFd == -1)
+  {
+    return "Failed to create temporary file";
+  }
+
+  // Append ".fifo" to the temporary file's name to make it unique and create a
+  // named pipe
+  channelName = string(nameBuffer) + ".fifo";
+  if (mkfifo(channelName.c_str(), S_IRUSR | S_IWUSR | S_IWGRP | S_IXGRP | 
+    S_IROTH | S_IWOTH) != 0)
+  {
+    return "Failed to create named pipe";
+  }
+
+  // Pass the preview channel name to the frame thread
+  gFrameThread->setPreviewChannel(channelName);
+  return "";
+}
+
+string native::openPreviewChannel(Napi::Env env, string name)
+{
+  printf("## openPreviewChannel(%s)\n", name.c_str());
+  return "openPreviewChannel";
+}
+
+bool native::getNextFrame(Napi::Env env, uint8_t** frame, size_t* length,
+  int width, int height)
+{
+  printf("## getNextFrame\n");
+  return false;
+}
+
+void native::closePreviewChannel(Napi::Env env)
+{
 }

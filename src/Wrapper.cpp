@@ -8,15 +8,21 @@ using namespace std;
 
 Napi::Object wrapper::Init(Napi::Env env, Napi::Object exports)
 {
-  exports.Set("initialize", Napi::Function::New(env, wrapper::initialized));
-  exports.Set("open", Napi::Function::New(env, wrapper::open));
-  exports.Set("write", Napi::Function::New(env, wrapper::write));
-  exports.Set("checkCompleted", Napi::Function::New(env, wrapper::checkCompleted));
-  exports.Set("close", Napi::Function::New(env, wrapper::close));
+  exports.Set("initializeFfmpeg", Napi::Function::New(env, wrapper::initializeFfmpeg));
+
+  exports.Set("createVideoOutput", Napi::Function::New(env, wrapper::createVideoOutput));
+  exports.Set("queueNextFrame", Napi::Function::New(env, wrapper::queueNextFrame));
+  exports.Set("checkCompletedFrames", Napi::Function::New(env, wrapper::checkCompletedFrames));
+  exports.Set("closeVideoOutput", Napi::Function::New(env, wrapper::closeVideoOutput));
+
+  exports.Set("createPreviewChannel", Napi::Function::New(env, wrapper::createPreviewChannel));
+  exports.Set("openPreviewChannel", Napi::Function::New(env, wrapper::openPreviewChannel));
+  exports.Set("getNextFrame", Napi::Function::New(env, wrapper::getNextFrame));
+  exports.Set("closePreviewChannel", Napi::Function::New(env, wrapper::closePreviewChannel));
   return exports;
 }
 
-void wrapper::initialized(const Napi::CallbackInfo& info)
+void wrapper::initializeFfmpeg(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
   if ((info.Length() != 1) || !info[0].IsString())
@@ -25,10 +31,10 @@ void wrapper::initialized(const Napi::CallbackInfo& info)
     return;
   }
   Napi::String ffmpegPath = info[0].As<Napi::String>();  
-  native::initialize(env, ffmpegPath);
+  native::initializeFfmpeg(env, ffmpegPath);
 }
 
-Napi::String wrapper::open(const Napi::CallbackInfo& info)
+Napi::String wrapper::createVideoOutput(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
   if ((info.Length() != 5) ||
@@ -46,12 +52,11 @@ Napi::String wrapper::open(const Napi::CallbackInfo& info)
   Napi::Number fps = info[2].As<Napi::Number>();
   Napi::String encoder = info[3].As<Napi::String>();
   Napi::String outputPath = info[4].As<Napi::String>();
-  Napi::String returnValue = Napi::String::New(env,
-    native::open(env, width, height, fps, encoder, outputPath));
-  return returnValue;  
+  return Napi::String::New(env, native::createVideoOutput(env, width, height, fps,
+    encoder, outputPath));
 }
 
-Napi::Number wrapper::write(const Napi::CallbackInfo& info)
+Napi::Number wrapper::queueNextFrame(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
   if ((info.Length() != 3) ||
@@ -71,22 +76,59 @@ Napi::Number wrapper::write(const Napi::CallbackInfo& info)
   Napi::Buffer<uint8_t> frame = info[0].As<Napi::Buffer<uint8_t>>();
   Napi::Number width = info[1].As<Napi::Number>();
   Napi::Number height = info[2].As<Napi::Number>();
-  Napi::Number returnValue = Napi::Number::New(env,
-    native::write(env, frame.Data(), frame.Length(), width, height));
-  return returnValue;
+  return Napi::Number::New(env, native::queueNextFrame(env, frame.Data(), frame.Length(),
+    width, height));
 }
 
-Napi::Int32Array wrapper::checkCompleted(const Napi::CallbackInfo& info)
+Napi::Int32Array wrapper::checkCompletedFrames(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  vector<int> completedIds = native::checkCompleted(env);
+  vector<int> completedIds = native::checkCompletedFrames(env);
   Napi::Int32Array returnValue = Napi::Int32Array::New(env, completedIds.size());
   memcpy(returnValue.Data(), completedIds.data(), sizeof(int32_t) * completedIds.size());
   return returnValue;
 }
 
-void wrapper::close(const Napi::CallbackInfo& info)
+void wrapper::closeVideoOutput(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  native::close(env);
+  native::closeVideoOutput(env);
+}
+
+Napi::String wrapper::createPreviewChannel(const Napi::CallbackInfo& info)
+{
+  Napi::Env env = info.Env();
+  string channelName;
+  string error = native::createPreviewChannel(env, channelName);
+  if (!error.empty())
+  {
+    Napi::TypeError::New(env, error).ThrowAsJavaScriptException();
+    return Napi::String();
+  }
+  return Napi::String::New(env, channelName);
+}
+
+Napi::String wrapper::openPreviewChannel(const Napi::CallbackInfo& info)
+{
+  Napi::Env env = info.Env();
+  if ((info.Length() != 1) || !info[0].IsString())
+  {
+    Napi::TypeError::New(env, "Incorrect parameter type").ThrowAsJavaScriptException();
+    return Napi::String();
+  }
+  Napi::String name = info[0].As<Napi::String>();  
+  return Napi::String::New(env, native::openPreviewChannel(env, name));
+}
+
+Napi::Object wrapper::getNextFrame(const Napi::CallbackInfo& info)
+{
+  //bool getNextFrame(Napi::Env env, uint8_t** frame, size_t* length, int width,
+  //  int height);
+  return Napi::Object();
+}
+
+void wrapper::closePreviewChannel(const Napi::CallbackInfo& info)
+{
+  Napi::Env env = info.Env();
+  native::closePreviewChannel(env);
 }

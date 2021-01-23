@@ -6,10 +6,18 @@
 
 namespace native
 {
-  void initialize(Napi::Env env, std::string ffmpegPath);
-	std::string open(Napi::Env env, int width, int height, int fps, std::string encoder,
-    std::string outputPath);
-  int32_t write(Napi::Env env, uint8_t* frame, size_t length, int width, int height);
-  std::vector<int32_t> checkCompleted(Napi::Env env);
-  void close(Napi::Env env);
+  void initializeFfmpeg(Napi::Env env, std::string ffmpegPath);
+
+  std::string createVideoOutput(Napi::Env env, int width, int height, int fps,
+    std::string encoder, std::string outputPath);
+  int32_t queueNextFrame(Napi::Env env, uint8_t* frame, size_t length, int width,
+    int height);
+  std::vector<int32_t> checkCompletedFrames(Napi::Env env);
+  void closeVideoOutput(Napi::Env env);
+
+  std::string createPreviewChannel(Napi::Env env, std::string& channelName);
+  std::string openPreviewChannel(Napi::Env env, std::string name);
+  bool getNextFrame(Napi::Env env, uint8_t** frame, size_t* length, int width,
+    int height);
+  void closePreviewChannel(Napi::Env env);
 }
