@@ -71,7 +71,6 @@ void* FrameThread::run()
   // Close the preview channel
   if (previewChannel)
   {
-    printf("## [FrameThread] Close preview channel\n");
     unlink(previewChannelName.c_str());
   }
   return 0;
