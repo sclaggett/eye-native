@@ -2,6 +2,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <unistd.h>
 
 using namespace std;
 using namespace cv;
@@ -21,6 +22,7 @@ FrameThread::FrameThread(shared_ptr<FfmpegProcess> process,
 void* FrameThread::run()
 {
   uint32_t frameNumber = 0;
+  bool previewChannel = false;
   while (!checkForExit())
   {
     FrameWrapper* wrapper = 0;
@@ -42,9 +44,41 @@ void* FrameThread::run()
     // Write the raw frame to the ffmpeg process
     ffmpegProcess->writeStdin(frame.data, frame.total() * frame.elemSize());
 
+    // Create the preview channel if needed
+    if (!previewChannel)
+    {
+      unique_lock<mutex> lock(previewChannelMutex);
+      if (!previewChannelName.empty())
+      {
+        printf("## [FrameThread] Open preview channel: %s\n", previewChannelName.c_str());
+        previewChannel = true;
+      }
+
+      // Write the following to the named pipe:
+      // - Magic number
+      // - Frame number
+      // - Width
+      // - Height
+      // - DataLength
+      // - Data
+    }
+
     // Add the frame to the completed queue
     completedFrameQueue->addItem(wrapper);
     frameNumber += 1;
   }
+
+  // Close the preview channel
+  if (previewChannel)
+  {
+    printf("## [FrameThread] Close preview channel\n");
+    unlink(previewChannelName.c_str());
+  }
   return 0;
+}
+
+void FrameThread::setPreviewChannel(string channelName)
+{
+  unique_lock<mutex> lock(previewChannelMutex);
+  previewChannelName = channelName;
 }

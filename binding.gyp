@@ -4,11 +4,12 @@
     "cflags!": [ "-fno-exceptions" ],
     "cflags_cc!": [ "-fno-exceptions" ],
     "sources": [
-      "src/FrameThread.cpp",
       "src/FfmpegProcess.cpp",
+      "src/FrameThread.cpp",
       "src/main.cpp",
       "src/Native.cpp",
       "src/PipeReader.cpp",
+      "src/PreviewThread.cpp",
       "src/Thread.cpp",
       "src/Wrapper.cpp",
     ],

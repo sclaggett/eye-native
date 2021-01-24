@@ -1,10 +1,17 @@
 #include "Native.h"
 #include "FfmpegProcess.h"
 #include "FrameThread.h"
+#include "PreviewThread.h"
 #include "Wrapper.h"
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 using namespace std;
+using namespace cv;
 
 // Global variables
 string gFfmpegPath;
@@ -14,15 +21,17 @@ shared_ptr<Queue<FrameWrapper*>> gPendingFrameQueue(new Queue<FrameWrapper*>());
 shared_ptr<Queue<FrameWrapper*>> gCompletedFrameQueue(new Queue<FrameWrapper*>());
 shared_ptr<FfmpegProcess> gFfmpegProcess(nullptr);
 shared_ptr<FrameThread> gFrameThread(nullptr);
+shared_ptr<Queue<Mat*>> gPreviewFrameQueue(new Queue<Mat*>());
+shared_ptr<PreviewThread> gPreviewThread(nullptr);
 
-void native::initialize(Napi::Env env, string ffmpegPath)
+void native::initializeFfmpeg(Napi::Env env, string ffmpegPath)
 {
   // Remember the location of ffmpeg
   gFfmpegPath = ffmpegPath;
   gInitialized = true;
 }
 
-string native::open(Napi::Env env, int width, int height, int fps, string encoder,
+string native::createVideoOutput(Napi::Env env, int width, int height, int fps, string encoder,
   string outputPath)
 {
   // Make sure we've been initialized and aren't currently recording
@@ -45,14 +54,11 @@ string native::open(Napi::Env env, int width, int height, int fps, string encode
     gCompletedFrameQueue, width, height));
   gFrameThread->spawn();
 
-  printf("## Native library open(%i, %i, %i, %s)\n", (uint32_t)width, (uint32_t)height,
-    fps, outputPath.c_str());
-
   gRecording = true;
   return "";
 }
 
-int32_t native::write(Napi::Env env, uint8_t* frame, size_t length, int width,
+int32_t native::queueNextFrame(Napi::Env env, uint8_t* frame, size_t length, int width,
   int height)
 {
   // Make sure we've been initialized and are recording
@@ -76,7 +82,7 @@ int32_t native::write(Napi::Env env, uint8_t* frame, size_t length, int width,
   return wrapper->id;
 }
 
-vector<int32_t> native::checkCompleted(Napi::Env env)
+vector<int32_t> native::checkCompletedFrames(Napi::Env env)
 {
   // Return an array of all frames that we're done with and free the associated memory
   vector<int32_t> ret;
@@ -89,9 +95,8 @@ vector<int32_t> native::checkCompleted(Napi::Env env)
   return ret;
 }
 
-void native::close(Napi::Env env)
+void native::closeVideoOutput(Napi::Env env)
 {
-  printf("## Closing\n");
   if (!gRecording)
   {
     return;
@@ -113,4 +118,105 @@ void native::close(Napi::Env env)
     gFfmpegProcess = nullptr;
   }
   gRecording = false;
+}
+
+string native::createPreviewChannel(Napi::Env env, string& channelName)
+{
+  // Pass the preview channel name to the frame thread
+  if (gFrameThread == nullptr)
+  {
+    return "Create video output before preview channel";
+  }
+
+  // Create a temporary file
+  char nameBuffer[128];
+  snprintf(nameBuffer, 128, "/tmp/eyeNativeXXXXXX");
+  int tmpFd = mkstemp(nameBuffer);
+  if (tmpFd == -1)
+  {
+    return "Failed to create temporary file";
+  }
+
+  // Append ".fifo" to the temporary file's name to make it unique and create a
+  // named pipe
+  channelName = string(nameBuffer) + ".fifo";
+  if (mkfifo(channelName.c_str(), S_IRUSR | S_IWUSR | S_IWGRP | S_IXGRP | 
+    S_IROTH | S_IWOTH) != 0)
+  {
+    return "Failed to create named pipe";
+  }
+
+  // Pass the preview channel name to the frame thread
+  gFrameThread->setPreviewChannel(channelName);
+  return "";
+}
+
+string native::openPreviewChannel(Napi::Env env, string name)
+{
+  // Spawn the thread that will read frames from the remote frame thread
+  gPreviewThread = shared_ptr<PreviewThread>(new PreviewThread(name,
+    gPreviewFrameQueue));
+  gPreviewThread->spawn();
+  return "";
+}
+
+bool native::getNextFrame(Napi::Env env, uint8_t*& frame, size_t& length,
+  int maxWidth, int maxHeight)
+{
+  // Get the next preview frame and return if none are available
+  Mat* previewFrame = 0;
+  if (!gPreviewFrameQueue->waitItem(&previewFrame, 0))
+  {
+    return false;
+  }
+
+  // Use the standard approach to calculate the scaled size of the preview frame
+  double frameRatio = (double)previewFrame->cols / (double)previewFrame->rows;
+  double maxRatio = (double)maxWidth / (double)maxHeight;
+  uint32_t width, height;
+  if (frameRatio > maxRatio)
+  {
+    width = maxWidth;
+    height = (uint32_t)((double)previewFrame->rows * (double)maxWidth /
+      (double)previewFrame->cols);
+  }
+  else
+  {
+    height = maxHeight;
+    width = (uint32_t)((double)previewFrame->cols * (double)maxHeight /
+      (double)previewFrame->rows);
+  }
+
+  printf("## GetNextFrame, frame = (%i, %i), max = (%i, %i), resized = (%i, %i)\n",
+    previewFrame->cols, previewFrame->rows, maxWidth, maxHeight, width, height);
+
+  // Resize the preview frame and export it in the PNG format
+  Mat resizedFrame;
+  resize(*previewFrame, resizedFrame, Size2i(width, height), 0, 0, INTER_AREA);
+  vector<uchar> pngFrame;
+  imencode(".png", resizedFrame, pngFrame);
+
+  // Create a copy of the PNG frame data and delete the preview frame
+  length = pngFrame.size();
+  frame = new uint8_t[length];
+  memcpy(frame, &pngFrame[0], length);
+  delete previewFrame;
+  return true;
+}
+
+void native::closePreviewChannel(Napi::Env env)
+{
+  if (gPreviewThread != nullptr)
+  {
+    if (gPreviewThread->isRunning())
+    {
+      gPreviewThread->terminate();
+    }
+    gPreviewThread = nullptr;
+  }
+}
+
+void native::deletePreviewFrame(napi_env env, void* finalize_data, void* finalize_hint)
+{
+  delete[] reinterpret_cast<uint8_t*>(finalize_data);
 }
