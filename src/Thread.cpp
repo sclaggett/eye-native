@@ -2,8 +2,8 @@
 
 #ifdef _WIN32
 #else
-#  include <unistd.h>
-#  include <sys/syscall.h>
+  #include <unistd.h>
+  #include <sys/syscall.h>
 #endif
 
 using namespace std;
@@ -61,7 +61,7 @@ std::string Thread::terminate()
   success = TerminateThread(threadId, 1);
 #else
   int retVal = pthread_cancel(threadId);
-  success = (retVa == 0);
+  success = (retVal == 0);
 #endif
   if (!success)
   {
@@ -114,6 +114,6 @@ uint32_t Thread::runStart()
 #else
   void* Thread::runHelper(void* context)
   {
-    return (void*)((Thread*)context)->runStart();
+    return reinterpret_cast<void*>(((Thread*)context)->runStart());
   }
 #endif

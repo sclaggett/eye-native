@@ -2,13 +2,13 @@
 #include <stdexcept>
 #ifdef _WIN32
 #else
-#  include <unistd.h>
-#  include <sys/wait.h>
-#  include <signal.h>
-#  include <sys/types.h>
-#  ifdef __APPLE__
-#    include <crt_externs.h>
-#  endif
+  #include <unistd.h>
+  #include <sys/wait.h>
+  #include <signal.h>
+  #include <sys/types.h>
+  #ifdef __APPLE__
+    #include <crt_externs.h>
+  #endif
 #endif
 
 using namespace std;
@@ -93,7 +93,7 @@ uint32_t FfmpegProcess::run()
 #ifdef _WIN32
   Sleep(10);
 #else
-    usleep(100000);
+  usleep(100000);
 #endif
   }
   stdoutReader->terminate();
@@ -121,12 +121,12 @@ bool FfmpegProcess::startProcess()
   if (!CreatePipe(&childStdoutRd, &childStdoutWr, &saAttr, 0))
   {
     printf("ERROR: Failed to create stdout pipes\n");
-	return false;
+    return false;
   }
   if (!SetHandleInformation(childStdoutRd, HANDLE_FLAG_INHERIT, 0))
   {
     printf("ERROR: Failed to set stdout pipe flag\n");
-	return false;
+    return false;
   }
 
   // Create a pipe for the child process's stderr and ensure the read handle to the pipe is not inherited.
@@ -134,12 +134,12 @@ bool FfmpegProcess::startProcess()
   if (!CreatePipe(&childStderrRd, &childStderrWr, &saAttr, 0))
   {
     printf("ERROR: Failed to create stderr pipes\n");
-	return false;
+    return false;
   }
   if (!SetHandleInformation(childStderrRd, HANDLE_FLAG_INHERIT, 0))
   {
     printf("ERROR: Failed to set stderr pipe flag\n");
-	return false;
+    return false;
   }
   
   // Create a pipe for the child process's stdin and ensure the write handle is not inherited. 
@@ -147,12 +147,12 @@ bool FfmpegProcess::startProcess()
   if (!CreatePipe(&childStdinRd, &childStdinWr, &saAttr, 0))
   {
     printf("ERROR: Failed to create stdin pipes\n");
-	return false;
+    return false;
   }
   if (!SetHandleInformation(childStdinWr, HANDLE_FLAG_INHERIT, 0))
   {
     printf("ERROR: Failed to set stdin pipe flag\n");
-	return false;
+    return false;
   }
 
   // Set up members of the PROCESS_INFORMATION structure. 
@@ -170,17 +170,17 @@ bool FfmpegProcess::startProcess()
   string commandLine = executable;
   for (auto it = arguments.begin(); it != arguments.end(); ++it)
   {
-	commandLine += " ";
-	commandLine += *it;
+    commandLine += " ";
+    commandLine += *it;
   }
     
   // Create the child process.
   LPSTR cmdLineStr = strdup(commandLine.c_str());
   if (!CreateProcess(NULL, cmdLineStr, NULL, NULL, TRUE, 0, NULL, NULL, &siStartInfo, &piProcInfo))
   {
-	free(cmdLineStr);
+    free(cmdLineStr);
     printf("ERROR: Failed to create ffmpeg process\n");
-	return false;
+    return false;
   }
   free(cmdLineStr);
   
@@ -200,11 +200,11 @@ bool FfmpegProcess::startProcess()
 #else
   vector<string> environment;
   char** env;
-#  ifdef __APPLE__
-  env = *_NSGetEnviron();
-#  else
-  env = environ;
-#  endif
+  #ifdef __APPLE__
+    env = *_NSGetEnviron();
+  #else
+    env = environ;
+  #endif
   for (int i = 0; *(env + i) != 0; i++)
   {
     environment.push_back(*(env + i));

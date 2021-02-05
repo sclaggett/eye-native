@@ -36,7 +36,7 @@
         'xcode_settings': {
           "MACOSX_DEPLOYMENT_TARGET": "10.15"
         },
-		'libraries': [
+        'libraries': [
           "-lopencv_core",
           "-lopencv_imgproc",
           "-lopencv_highgui",
@@ -56,8 +56,8 @@
             'AdditionalOptions': ['/EHsc']
           }
         },
-		'libraries': [
-	      "opencv_world451.lib"
+        'libraries': [
+          "opencv_world451.lib"
         ]
       }]
     ]

@@ -8,9 +8,9 @@
 #include <stdio.h>
 #ifdef _WIN32
 #else
-#  include <sys/stat.h>
-#  include <sys/types.h>
-#  include <unistd.h>
+  #include <sys/stat.h>
+  #include <sys/types.h>
+  #include <unistd.h>
 #endif
 
 using namespace std;

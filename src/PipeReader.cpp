@@ -1,7 +1,7 @@
 #include "PipeReader.h"
 #ifdef _WIN32
 #else
-#  include <unistd.h>
+  #include <unistd.h>
 #endif
 
 using namespace std;
@@ -31,17 +31,17 @@ uint32_t PipeReader::run()
   {
 #ifdef _WIN32
     DWORD dwRead = 0;
-	if (!ReadFile(fd, buffer, 1023, &dwRead, NULL))
-	{
+    if (!ReadFile(fd, buffer, 1023, &dwRead, NULL))
+    {
       printf("ERROR: Failed to read from pipe\n");
       return 0;
-	}
-	if (dwRead == 0)
-	{
-	  break;
-	}
-	else
-	{
+    }
+    if (dwRead == 0)
+    {
+      break;
+    }
+    else
+    {
       buffer[dwRead] = 0;
       unique_lock<mutex> lock(dataMutex);
       data += buffer;

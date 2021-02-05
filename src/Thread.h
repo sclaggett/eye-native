@@ -4,9 +4,8 @@
 #include <memory>
 #include <mutex>
 #include <string>
-
 #ifdef _WIN32
-#  include <Windows.h>
+  #include <Windows.h>
 #endif
 
 class Thread
