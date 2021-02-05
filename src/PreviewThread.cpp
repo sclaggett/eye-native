@@ -1,5 +1,10 @@
 #include "PreviewThread.h"
 
+#ifdef _WIN32
+#else
+#  include <unistd.h>
+#endif
+
 using namespace std;
 using namespace cv;
 
@@ -10,15 +15,18 @@ PreviewThread::PreviewThread(string name, shared_ptr<Queue<cv::Mat*>> queue) :
 {
 }
 
-#include <unistd.h>
-void* PreviewThread::run()
+uint32_t PreviewThread::run()
 {
   printf("## Starting preview thread\n");
 
   uint32_t temp = 0;
   while (!checkForExit())
   {
+#ifdef _WIN32
+	Sleep(10);
+#else
     usleep(10 * 1000);
+#endif
 
     // Read the following from the named pipe:
     // - Magic number

@@ -1,12 +1,15 @@
 #include "FfmpegProcess.h"
-#include <unistd.h>
-#ifdef __APPLE__
-  #include <crt_externs.h>
-#endif
-#include <sys/wait.h>
 #include <stdexcept>
-#include <signal.h>
-#include <sys/types.h>
+#ifdef _WIN32
+#else
+#  include <unistd.h>
+#  include <sys/wait.h>
+#  include <signal.h>
+#  include <sys/types.h>
+#  ifdef __APPLE__
+#    include <crt_externs.h>
+#  endif
+#endif
 
 using namespace std;
 
@@ -58,7 +61,7 @@ FfmpegProcess::FfmpegProcess(string exec, uint32_t width, uint32_t height, uint3
   arguments.push_back(outputPath);
 }
 
-void* FfmpegProcess::run()
+uint32_t FfmpegProcess::run()
 {
   if (!startProcess())
   {
@@ -87,7 +90,11 @@ void* FfmpegProcess::run()
       terminateProcess();
       break;
     }
+#ifdef _WIN32
+  Sleep(10);
+#else
     usleep(100000);
+#endif
   }
   stdoutReader->terminate();
   stderrReader->terminate();
@@ -102,13 +109,102 @@ void* FfmpegProcess::run()
 
 bool FfmpegProcess::startProcess()
 {
+#ifdef _WIN32
+  // Set the bInheritHandle flag so pipe handles are inherited.
+  SECURITY_ATTRIBUTES saAttr;
+  saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+  saAttr.bInheritHandle = TRUE;
+  saAttr.lpSecurityDescriptor = NULL;
+  
+  // Create a pipe for the child process's stdout and ensure the read handle to the pipe is not inherited.
+  HANDLE childStdoutRd = NULL, childStdoutWr = NULL;
+  if (!CreatePipe(&childStdoutRd, &childStdoutWr, &saAttr, 0))
+  {
+    printf("ERROR: Failed to create stdout pipes\n");
+	return false;
+  }
+  if (!SetHandleInformation(childStdoutRd, HANDLE_FLAG_INHERIT, 0))
+  {
+    printf("ERROR: Failed to set stdout pipe flag\n");
+	return false;
+  }
+
+  // Create a pipe for the child process's stderr and ensure the read handle to the pipe is not inherited.
+  HANDLE childStderrRd = NULL, childStderrWr = NULL;
+  if (!CreatePipe(&childStderrRd, &childStderrWr, &saAttr, 0))
+  {
+    printf("ERROR: Failed to create stderr pipes\n");
+	return false;
+  }
+  if (!SetHandleInformation(childStderrRd, HANDLE_FLAG_INHERIT, 0))
+  {
+    printf("ERROR: Failed to set stderr pipe flag\n");
+	return false;
+  }
+  
+  // Create a pipe for the child process's stdin and ensure the write handle is not inherited. 
+  HANDLE childStdinRd = NULL, childStdinWr = NULL;
+  if (!CreatePipe(&childStdinRd, &childStdinWr, &saAttr, 0))
+  {
+    printf("ERROR: Failed to create stdin pipes\n");
+	return false;
+  }
+  if (!SetHandleInformation(childStdinWr, HANDLE_FLAG_INHERIT, 0))
+  {
+    printf("ERROR: Failed to set stdin pipe flag\n");
+	return false;
+  }
+
+  // Set up members of the PROCESS_INFORMATION structure. 
+  PROCESS_INFORMATION piProcInfo; 
+  ZeroMemory( &piProcInfo, sizeof(PROCESS_INFORMATION) );
+  STARTUPINFO siStartInfo;
+  ZeroMemory( &siStartInfo, sizeof(STARTUPINFO) );
+  siStartInfo.cb = sizeof(STARTUPINFO); 
+  siStartInfo.hStdError = childStderrWr;
+  siStartInfo.hStdOutput = childStdoutWr;
+  siStartInfo.hStdInput = childStdinRd;
+  siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+ 
+  // Format the executable and arguments into a single string.
+  string commandLine = executable;
+  for (auto it = arguments.begin(); it != arguments.end(); ++it)
+  {
+	commandLine += " ";
+	commandLine += *it;
+  }
+    
+  // Create the child process.
+  LPSTR cmdLineStr = strdup(commandLine.c_str());
+  if (!CreateProcess(NULL, cmdLineStr, NULL, NULL, TRUE, 0, NULL, NULL, &siStartInfo, &piProcInfo))
+  {
+	free(cmdLineStr);
+    printf("ERROR: Failed to create ffmpeg process\n");
+	return false;
+  }
+  free(cmdLineStr);
+  
+  // Close the handles to the child process thread and the stdin, stdout, and stderr pipes no longer
+  // needed by the child process.
+  CloseHandle(piProcInfo.hThread);
+  CloseHandle(childStdoutWr);
+  CloseHandle(childStderrWr);
+  CloseHandle(childStdinRd);
+  
+  // Remember the handles.
+  processPid = piProcInfo.hProcess;
+  processStdin = childStdinWr;
+  processStdout = childStdoutRd;
+  processStderr = childStderrRd;
+  return true;
+#else
   vector<string> environment;
   char** env;
-#ifdef __APPLE__
+#  ifdef __APPLE__
   env = *_NSGetEnviron();
-#else
+#  else
   env = environ;
-#endif
+#  endif
   for (int i = 0; *(env + i) != 0; i++)
   {
     environment.push_back(*(env + i));
@@ -186,6 +282,7 @@ bool FfmpegProcess::startProcess()
     printf("ERROR: Failed to fork child\n");
     return false;
   }
+#endif
 }
 
 bool FfmpegProcess::isProcessRunning()
@@ -195,6 +292,15 @@ bool FfmpegProcess::isProcessRunning()
   {
     return false;
   }
+#ifdef _WIN32
+  DWORD exitCode = 0;
+  if (!GetExitCodeProcess(processPid, &exitCode))
+  {
+    printf("ERROR: Failed to check if child process is running\n");
+    return false;
+  }
+  return (exitCode == STILL_ACTIVE);
+#else
   int status;
   int res = waitpid(processPid, &status, WNOHANG);
   if (res == 0)
@@ -211,21 +317,30 @@ bool FfmpegProcess::isProcessRunning()
   }
   else
   {
-    printf("ERROR: Failed to wait for child process\n");
+    printf("ERROR: Failed to check if child process is running\n");
     return false;
   }
+#endif
 }
 
 void FfmpegProcess::waitForExit()
 {
   if (processStdin != 0)
   {
+#ifdef _WIN32
+    CloseHandle(processStdin);
+#else
     close(processStdin);
+#endif
     processStdin = 0;
   }
   while (isRunning())
   {
+#ifdef _WIN32
+    Sleep(10);
+#else
     usleep(10000);
+#endif
   }
 }
 
@@ -236,8 +351,16 @@ void FfmpegProcess::writeStdin(uint8_t* data, uint32_t length)
     printf("ERROR: Stdin has been closed\n");
     return;
   }
-  ssize_t ret = write(processStdin, data, length); 
-  if (ret != (int32_t)length)
+  bool success = false;
+#ifdef _WIN32  
+  DWORD dwWritten = 0;
+  success = WriteFile(processStdin, data, length, &dwWritten, NULL);
+  success &= (dwWritten == length);
+#else
+  ssize_t ret = write(processStdin, data, length);
+  success = (ret == (int32_t)length);
+#endif
+  if (!success)
   {
     printf("ERROR: Failed to write to process stdin\n");
   }
@@ -255,24 +378,40 @@ string FfmpegProcess::readStderr()
 
 void FfmpegProcess::terminateProcess()
 {
+#ifdef _WIN32
+  TerminateProcess(processPid, 1);
+#else
   kill(processPid, SIGKILL);
+#endif
 }
 
 void FfmpegProcess::cleanUpProcess()
 {
   if (processStdin != 0)
   {
+#ifdef _WIN32
+    CloseHandle(processStdin);
+#else
     close(processStdin);
+#endif
     processStdin = 0;
   }
   if (processStdout != 0)
   {
+#ifdef _WIN32
+    CloseHandle(processStdout);
+#else
     close(processStdout);
+#endif
     processStdout = 0;
   }
   if (processStderr != 0)
   {
+#ifdef _WIN32
+    CloseHandle(processStderr);
+#else
     close(processStderr);
+#endif
     processStderr = 0;
   }
 }

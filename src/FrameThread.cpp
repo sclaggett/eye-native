@@ -2,7 +2,11 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-#include <unistd.h>
+
+#ifdef _WIN32
+#else
+#  include <unistd.h>
+#endif
 
 using namespace std;
 using namespace cv;
@@ -19,7 +23,7 @@ FrameThread::FrameThread(shared_ptr<FfmpegProcess> process,
 {
 }
 
-void* FrameThread::run()
+uint32_t FrameThread::run()
 {
   uint32_t frameNumber = 0;
   bool previewChannel = false;

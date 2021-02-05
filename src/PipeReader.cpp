@@ -1,9 +1,16 @@
 #include "PipeReader.h"
-#include <unistd.h>
+#ifdef _WIN32
+#else
+#  include <unistd.h>
+#endif
 
 using namespace std;
 
+#ifdef _WIN32
+PipeReader::PipeReader(string name, HANDLE f) :
+#else
 PipeReader::PipeReader(string name, int f) :
+#endif
   Thread(name),
   fd(f)
 {
@@ -17,11 +24,29 @@ string PipeReader::getData()
   return ret;
 }
 
-void* PipeReader::run()
+uint32_t PipeReader::run()
 {
   char buffer[1024];
   while (!checkForExit())
   {
+#ifdef _WIN32
+    DWORD dwRead = 0;
+	if (!ReadFile(fd, buffer, 1023, &dwRead, NULL))
+	{
+      printf("ERROR: Failed to read from pipe\n");
+      return 0;
+	}
+	if (dwRead == 0)
+	{
+	  break;
+	}
+	else
+	{
+      buffer[dwRead] = 0;
+      unique_lock<mutex> lock(dataMutex);
+      data += buffer;
+    }
+#else
     fd_set set;
     FD_ZERO(&set);
     FD_SET(fd, &set);
@@ -54,6 +79,7 @@ void* PipeReader::run()
       unique_lock<mutex> lock(dataMutex);
       data += buffer;
     }
+#endif
   }
   return 0;
 }

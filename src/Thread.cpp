@@ -1,6 +1,10 @@
 #include "Thread.h"
-#include <unistd.h>
-#include <sys/syscall.h>
+
+#ifdef _WIN32
+#else
+#  include <unistd.h>
+#  include <sys/syscall.h>
+#endif
 
 using namespace std;
 
@@ -15,8 +19,16 @@ std::string Thread::spawn()
   {
     return "An instance of the thread is already running";
   }
+  bool success = false;
+#ifdef _WIN32
+  DWORD dwThreadId = 0;
+  threadId = CreateThread(NULL, 0, &Thread::runHelper, this, 0, &dwThreadId);
+  success = (threadId != NULL);
+#else
   int retVal = pthread_create(&threadId, nullptr, &Thread::runHelper, this);
-  if (retVal)
+  success = (retVal == 0);
+#endif
+  if (!success)
   {
     return "Failed to spawn thread";
   }
@@ -44,8 +56,14 @@ std::string Thread::terminate()
   {
     return "";
   }
+  bool success = false;
+#ifdef _WIN32
+  success = TerminateThread(threadId, 1);
+#else
   int retVal = pthread_cancel(threadId);
-  if (retVal != 0)
+  success = (retVa == 0);
+#endif
+  if (!success)
   {
     return "Unable to cancel thread";
   }
@@ -81,14 +99,21 @@ bool Thread::waitForCompletion(uint32_t timeout)
   return !threadRunning;
 }
 
-void* Thread::runStart()
+uint32_t Thread::runStart()
 {
-  void* retVal = run();
+  uint32_t retVal = run();
   signalComplete();
   return retVal;
 }
 
-void* Thread::runHelper(void* context)
-{
-  return ((Thread*)context)->runStart();
-}
+#ifdef _WIN32
+  DWORD Thread::runHelper(void* context)
+  {
+    return (DWORD)((Thread*)context)->runStart();
+  }
+#else
+  void* Thread::runHelper(void* context)
+  {
+    return (void*)((Thread*)context)->runStart();
+  }
+#endif

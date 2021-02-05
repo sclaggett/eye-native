@@ -6,9 +6,12 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <stdio.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
+#ifdef _WIN32
+#else
+#  include <sys/stat.h>
+#  include <sys/types.h>
+#  include <unistd.h>
+#endif
 
 using namespace std;
 using namespace cv;
@@ -122,6 +125,10 @@ void native::closeVideoOutput(Napi::Env env)
 
 string native::createPreviewChannel(Napi::Env env, string& channelName)
 {
+#ifdef _WIN32
+  // TODO
+  return "";
+#else  
   // Pass the preview channel name to the frame thread
   if (gFrameThread == nullptr)
   {
@@ -149,6 +156,7 @@ string native::createPreviewChannel(Napi::Env env, string& channelName)
   // Pass the preview channel name to the frame thread
   gFrameThread->setPreviewChannel(channelName);
   return "";
+#endif
 }
 
 string native::openPreviewChannel(Napi::Env env, string name)

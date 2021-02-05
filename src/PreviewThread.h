@@ -11,7 +11,7 @@ public:
   PreviewThread(std::string channelName, std::shared_ptr<Queue<cv::Mat*>> previewQueue);
   virtual ~PreviewThread() {};
 
-  void* run();
+  uint32_t run();
 
 private:
   std::string channelName;

@@ -44,7 +44,9 @@
         }
       }],
       ['OS=="win"', {
-        'include_dirs': [],
+        'include_dirs': [
+          "opencv/win/include/"
+        ],
         'library_dirs': []
       }],
     ],

@@ -22,7 +22,7 @@ public:
     std::shared_ptr<Queue<FrameWrapper*>> completedFrameQueue, uint32_t width, uint32_t height);
   virtual ~FrameThread() {};
 
-  void* run();
+  uint32_t run();
 
   void setPreviewChannel(std::string channelName);
 
