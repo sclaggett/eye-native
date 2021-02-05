@@ -26,6 +26,7 @@
         'library_dirs': []
       }],
       ['OS=="mac"', {
+        'product_dir': 'build/Release/',
         'include_dirs': [
           "opencv/mac/include/"
         ],
