@@ -18,10 +18,10 @@
       "<!@(node -p \"require('node-addon-api').include\")",
     ],
     'libraries': [
-      "-lopencv_core",
-      "-lopencv_imgproc",
-      "-lopencv_highgui",
-      "-lopencv_features2d",
+#      "-lopencv_core",
+#      "-lopencv_imgproc",
+#      "-lopencv_highgui",
+#      "-lopencv_features2d",
     ],
     'dependencies': [
       "<!(node -p \"require('node-addon-api').gyp\")"
@@ -47,7 +47,15 @@
         'include_dirs': [
           "opencv/win/include/"
         ],
-        'library_dirs': []
+        'library_dirs': [
+          "../opencv/win/lib/"
+        ],
+        'msvs_settings': {
+          'VCCLCompilerTool': {
+            'ExceptionHandling': '1',    
+            'AdditionalOptions': ['/EHsc']
+          }
+        }
       }],
     ],
   }]
