@@ -13,7 +13,6 @@
       "src/Thread.cpp",
       "src/Wrapper.cpp",
     ],
-    'product_dir': 'build/Release/',
     'include_dirs': [
       "<!@(node -p \"require('node-addon-api').include\")",
     ],
@@ -58,7 +57,15 @@
         },
         'libraries': [
           "opencv_world451.lib"
-        ]
+        ],
+		"copies":[
+		  {
+		    'destination': './build/Release',
+			'files':[
+			  'opencv/win/lib/opencv_world451.dll'
+			]
+	      }
+        ]	  
       }]
     ]
   }]
