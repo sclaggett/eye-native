@@ -59,14 +59,14 @@
         'libraries': [
           "opencv_world451.lib"
         ],
-		"copies":[
-		  {
-		    'destination': './build/Release',
-			'files':[
-			  'opencv/win/lib/opencv_world451.dll'
-			]
-	      }
-        ]	  
+        "copies":[
+          {
+            'destination': './build/Release',
+            'files':[
+              'opencv/win/lib/opencv_world451.dll'
+            ]
+          }
+        ]
       }]
     ]
   }]

@@ -1,0 +1,10 @@
+* text eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.icns binary
+sitenative/opencv/mac/lib/*.a binary
+sitenative/opencv/win/lib/*.dll binary
+sitenative/opencv/win/lib/*.lib binary
+

@@ -14,7 +14,8 @@ let native = null;
 
 function getModuleRoot() {
   const bind = require('bindings');
-  const moduleRoot = bind.getRoot(bind.getFileName());
+  const path = require('path');
+  let moduleRoot = bind.getRoot(bind.getFileName());
   native = bind('eyenative');
   return moduleRoot;
 }
