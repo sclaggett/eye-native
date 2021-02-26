@@ -9,12 +9,12 @@ Initialize dependencies by running `yarn install` and build the library by runni
 The OpenCV static libraries for Mac were built from source:
 
 ```sh
-cd <working_directory>
-git clone https://github.com/opencv/opencv.git
-git clone https://github.com/opencv/opencv_contrib.git
-mkdir build_opencv
-cd build_opencv
-cmake -D CMAKE_BUILD_TYPE=Release \
+$ cd <working_directory>
+$ git clone https://github.com/opencv/opencv.git
+$ git clone https://github.com/opencv/opencv_contrib.git
+$ mkdir build_opencv
+$ cd build_opencv
+$ cmake -D CMAKE_BUILD_TYPE=Release \
   -D OPENCV_EXTRA_MODULES_PATH=../opencv_contrib/modules \
   -D BUILD_SHARED_LIBS=OFF \
   -D WITH_ITT=OFF \
