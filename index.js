@@ -6,8 +6,8 @@
  * in both main process and the renderer process. Everything works find for the main
  * process but the bindings will fail to resolve for the renderer. Solve this by having
  * the main process call getModuleRoot() before it invokes any other functions,
- * passing it to the renderer process, and having that process setModuleRoot() before
- * it invokes any other functions.
+ * passing the root path to the renderer process, and having that process call
+ * setModuleRoot() before any other functions.
  */
  
 let native = null;

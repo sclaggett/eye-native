@@ -6,7 +6,7 @@ Initialize dependencies by running `yarn install` and build the library by runni
 
 ## Compiling OpenCV
 
-The OpenCV static libraries for Mac were built from source:
+The OpenCV libraries for Mac were built from source:
 
 ```sh
 $ cd <working_directory>
@@ -16,10 +16,31 @@ $ mkdir build_opencv
 $ cd build_opencv
 $ cmake -D CMAKE_BUILD_TYPE=Release \
   -D OPENCV_EXTRA_MODULES_PATH=../opencv_contrib/modules \
-  -D BUILD_SHARED_LIBS=OFF \
+  -D CMAKE_INSTALL_PREFIX=./install \
+  -D WITH_WEBP=OFF \
+  -D WITH_OPENJPEG=OFF \
+  -D WITH_JASPER=OFF \
+  -D WITH_OPENEXR=OFF \
   -D WITH_ITT=OFF \
   -D WITH_IPP=OFF \
+  -D BUILD_TESTS=OFF \
+  -D BUILD_PERF_TESTS=OFF \
+  -D BUILD_EXAMPLES=OFF \
+  -D BUILD_opencv_apps=OFF \
+  -D BUILD_JAVA=OFF \
+  -D BUILD_opencv_python2=OFF \
+  -D BUILD_opencv_python3=OFF \
   ../opencv
+$ make
+$ make install
+$ rm -rf [$/opencv/mac/lib/*]
+$ cp install/lib/libopencv_core*.dylib [$/opencv/mac/lib/]
+$ cp install/lib/libopencv_features2d*.dylib [$/opencv/mac/lib/]
+$ cp install/lib/libopencv_highgui*.dylib [$/opencv/mac/lib/]
+$ cp install/lib/libopencv_imgcodecs*.dylib [$/opencv/mac/lib/]
+$ cp install/lib/libopencv_imgproc*.dylib [$/opencv/mac/lib/]
+$ rm -rf [$/opencv/mac/include/*]
+$ cp -R install/include/opencv4/* [$/opencv/mac/include/]
 ```
 
 ## Native development
@@ -27,11 +48,9 @@ $ cmake -D CMAKE_BUILD_TYPE=Release \
 You can shorten your iteration time when developing this library in the context of e.g. eye-candy as follows:
 
 1. Check out eye-candy and eye-native repositories in sibling directories.
-2. Modify eye-candy's app `package.json` to change the eye-native dependency from `sclaggett/eye-native.git` to `../../eye-native`.
-3. Make your changes in eye-native and run `yarn build` to make sure they compile.
-4. Force eye-candy to pick up the changes by running `cd app`, `rm -rf node_modules/eye-native` and `yarn install --check-files`.
-
-Maybe just `yarn upgrade eye-native`?
+2. Modify eye-candy's `app/package.json` to change the eye-native dependency from `sclaggett/eye-native.git` to `../../eye-native`.
+3. Make your changes in eye-native and run `yarn build` to confirm they compile.
+4. Force eye-candy to pick up the changes by running `cd app` and `yarn upgrade eye-native`.
 
 ## Windows development
 

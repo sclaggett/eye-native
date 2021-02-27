@@ -129,7 +129,7 @@ string native::createPreviewChannel(Napi::Env env, string& channelName)
   // TODO
   return "";
 #else  
-  // Pass the preview channel name to the frame thread
+  // Make sure the main thread is running
   if (gFrameThread == nullptr)
   {
     return "Create video output before preview channel";
