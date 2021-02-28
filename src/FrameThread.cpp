@@ -1,15 +1,35 @@
 #include "FrameThread.h"
+#include "FrameHeader.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
 #ifdef _WIN32
 #else
+  #include <fcntl.h>
+  #include <sys/stat.h>
+  #include <sys/types.h>
   #include <unistd.h>
 #endif
 
 using namespace std;
 using namespace cv;
+
+// This should go in a class that hides the cross-platform messiness
+bool WriteData(int fd, const uint8_t* data, uint32_t length)
+{
+  uint32_t bytesWritten = 0;
+  while (bytesWritten < length)
+  {
+    ssize_t ret = write(fd, data + bytesWritten, length - bytesWritten);
+    if (ret == -1)
+    {
+      return false;
+    }
+    bytesWritten += ret;
+  }
+  return true;
+}
 
 FrameThread::FrameThread(shared_ptr<FfmpegProcess> process,
     shared_ptr<Queue<FrameWrapper*>> pendingQueue,
@@ -36,6 +56,7 @@ uint32_t FrameThread::run()
 #ifdef _WIN32
   HANDLE namedPipe = 0;
 #else
+  int namedPipe = 0;
 #endif
   while (!checkForExit())
   {
@@ -56,7 +77,8 @@ uint32_t FrameThread::run()
     }
 
     // Write the raw frame to the ffmpeg process
-    ffmpegProcess->writeStdin(frame.data, frame.total() * frame.elemSize());
+    uint32_t frameLength = frame.total() * frame.elemSize();
+    ffmpegProcess->writeStdin(frame.data, frameLength);
 
     // Create the preview channel
     if (channelState == CHANNEL_CLOSED)
@@ -65,58 +87,87 @@ uint32_t FrameThread::run()
       if (!previewChannelName.empty())
       {
 #ifdef _WIN32
-		// Create the named pipe
+        // Create the named pipe
         printf("## [FrameThread] Creating named pipe: %s\n", previewChannelName.c_str());
-		namedPipe = CreateNamedPipe(previewChannelName.c_str(), PIPE_ACCESS_OUTBOUND,
-		  PIPE_TYPE_BYTE | PIPE_NOWAIT, 1, 0, 0, 0, NULL);
-		if (namedPipe == INVALID_HANDLE_VALUE)
-		{
-		  printf("Error: Failed to create named pipe\n");
-		  channelState = CHANNEL_ERROR;
-		  continue;
-		}
+        namedPipe = CreateNamedPipe(previewChannelName.c_str(), PIPE_ACCESS_OUTBOUND,
+          PIPE_TYPE_BYTE | PIPE_NOWAIT, 1, 0, 0, 0, NULL);
+        if (namedPipe == INVALID_HANDLE_VALUE)
+        {
+          printf("[FrameThread] Failed to create named pipe\n");
+          channelState = CHANNEL_ERROR;
+          continue;
+        }
+
+        // Set the state to opening while we wait for the remote process to connect
         printf("## [FrameThread] Pipe created, waiting for renderer process to connect\n");
-#else
-#endif
         channelState = CHANNEL_OPENING;
+#else
+        // Attempt to create the named pipe in nonblocking mode. This will only succeed
+        // if the remote process has already opened the pipe for reading. We use this
+        // approach so this thread doesn't hang forever waiting on the remote process
+        namedPipe = open(previewChannelName.c_str(), O_WRONLY | O_NONBLOCK);
+        if (namedPipe == -1)
+        {
+          // A response of ENXIO is expected and means the other end of the pipe hasn't
+          // been opened for reading, any other error code means something else went wrong
+          if (errno != ENXIO)
+          {
+            printf("[FrameThread] Failed to create named pipe\n");
+            channelState = CHANNEL_ERROR;
+          }
+          continue;
+        }
+
+        // Switch the named pipe to blocking mode now that the other end is connected
+        int flags = fcntl(namedPipe, F_GETFL, 0);
+        flags &= ~O_NONBLOCK;
+        fcntl(namedPipe, F_SETFL, flags);
+
+        // Skip the opening state and go straight to open
+        channelState = CHANNEL_OPEN;
+#endif
       }
-	}
+    }
 
     // Check asynchronously if the renderer process has connected to the preview channel
-	if (channelState == CHANNEL_OPENING)
-	{
+    if (channelState == CHANNEL_OPENING)
+    {
 #ifdef _WIN32
-	  // Wait for the client to connect
-	  ConnectNamedPipe(namedPipe, NULL);
-	  DWORD err = GetLastError();
-	  if (err == ERROR_PIPE_CONNECTED)
-	  {
+      // Wait for the client to connect
+      ConnectNamedPipe(namedPipe, NULL);
+      DWORD err = GetLastError();
+      if (err == ERROR_PIPE_CONNECTED)
+      {
         printf("## [FrameThread] Renderer process has connected\n");
-		channelState = CHANNEL_OPEN;
-	  }
-	  else if (err != ERROR_IO_PENDING)
-	  {
-		printf("Error: Named pipe connetion failed: %i\n", err);
-		channelState = CHANNEL_ERROR;
-		continue;
-	  }
+        channelState = CHANNEL_OPEN;
+      }
+      else if (err != ERROR_IO_PENDING)
+      {
+        printf("[FrameThread] Named pipe connetion failed: %i\n", err);
+        channelState = CHANNEL_ERROR;
+        continue;
+      }
 #else
 #endif
-	}
-	
-	// Write the frame to the named pipe once the connection is established
-	if (channelState == CHANNEL_OPEN)
-	{
-      printf("## [FrameThread] Write frame to pipe\n");
-      // Write the following to the named pipe:
-      // - Magic number
-      // - Frame number
-      // - Width
-      // - Height
-      // - DataLength
-      // - Data
     }
-		
+    
+    // Write the frame to the named pipe once the connection is established
+    if (channelState == CHANNEL_OPEN)
+    {
+      string header = frameheader::format(frameNumber, width, height, frameLength);
+#ifdef _WIN32
+#else
+      // Write the frame to the named pipe
+      if (!WriteData(namedPipe, (const uint8_t*)header.data(), header.size()) ||
+        !WriteData(namedPipe, (const uint8_t*)frame.data, frameLength))
+      {
+        printf("[FrameThread] Failed to write frame to pipe\n");
+        channelState = CHANNEL_ERROR;
+        continue;
+      }
+#endif
+    }
+    
     // Add the frame to the completed queue
     completedFrameQueue->addItem(wrapper);
     frameNumber += 1;
@@ -126,7 +177,7 @@ uint32_t FrameThread::run()
   if (channelState != CHANNEL_CLOSED)
   {
 #ifdef _WIN32
-  	CloseHandle(namedPipe);
+    CloseHandle(namedPipe);
 #else
     unlink(previewChannelName.c_str());
 #endif

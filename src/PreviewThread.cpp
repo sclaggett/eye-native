@@ -1,11 +1,31 @@
 #include "PreviewThread.h"
+#include "FrameHeader.h"
 #ifdef _WIN32
 #else
+  #include <fcntl.h>
+  #include <sys/stat.h>
+  #include <sys/types.h>
   #include <unistd.h>
 #endif
 
 using namespace std;
 using namespace cv;
+
+// This should go in a class that hides the cross-platform messiness
+bool ReadData(int fd, uint8_t* data, uint32_t length)
+{
+  uint32_t bytesRead = 0;
+  while (bytesRead < length)
+  {
+    ssize_t ret = read(fd, data + bytesRead, length - bytesRead);
+    if (ret == -1)
+    {
+      return false;
+    }
+    bytesRead += ret;
+  }
+  return true;
+}
 
 PreviewThread::PreviewThread(string name, shared_ptr<Queue<cv::Mat*>> queue) :
   Thread("preview"),
@@ -18,47 +38,56 @@ uint32_t PreviewThread::run()
 {
   printf("## Starting preview thread\n");
 
-  uint32_t temp = 0;
-  while (!checkForExit())
-  {
+  // Open the named pipe
 #ifdef _WIN32
-    Sleep(30);
 #else
-    usleep(30 * 1000);
+  int namedPipe = open(channelName.c_str(), O_RDONLY);
+  if (namedPipe == -1)
+  {
+    printf("## Failed to open named pipe\n");
+    return 1;
+  }
 #endif
 
-    // Read the following from the named pipe:
-    // - Magic number
-    // - Frame number
-    // - Width
-    // - Height
-    // - DataLength
-    // - Data
-
-    uint32_t width = 1024;
-    uint32_t height = 768;
-    size_t length = width * height * 4;
-    uint8_t* data = new uint8_t[length];
-    uint32_t offset = 0;
-    for (uint32_t y = 0; y < height; ++y)
+  uint8_t frameHeader[FRAME_HEADER_SIZE];
+  uint8_t* buffer = 0;
+  uint32_t bufferSize = 0;
+  uint32_t number, width, height, length;
+  while (!checkForExit())
+  {
+    // Read the frame header from the named pipe and extract the fields
+    if (!ReadData(namedPipe, &(frameHeader[0]), FRAME_HEADER_SIZE))
     {
-      for (uint32_t x = 0; x < width; ++x)
-      {
-        uint32_t clr = temp % 255;
-        *(data + offset++) = clr; // B
-        *(data + offset++) = clr; // G
-        *(data + offset++) = clr; // R
-        *(data + offset++) = 255; // A
-      }
+      printf("[PreviewThread] Failed to read from named pipe\n");
+      return 1;
+    }
+    if (!frameheader::parse(frameHeader, number, width, height, length))
+    {
+      printf("[PreviewThread] Failed to parse frame header\n");
+      return 1;
     }
 
-    Mat wrapped(height, width, CV_8UC4, data);
+    // Read the frame
+    if (bufferSize < length)
+    {
+      if (bufferSize != 0)
+      {
+        delete [] buffer;
+      }
+      bufferSize = length;
+      buffer = new uint8_t[bufferSize];
+    }
+    if (!ReadData(namedPipe, buffer, length))
+    {
+      printf("[PreviewThread] Failed to read from named pipe\n");
+      return 1;
+    }
+
+    // Wrap the frame as an OpenCV matrix and add it to the preview queue
+    Mat wrapped(height, width, CV_8UC4, buffer);
     Mat* copy = new Mat;
     wrapped.copyTo(*copy);
     previewQueue->addItem(copy);
-
-    delete [] data;
-    temp += 1;
   }
 
   printf("## Stopping preview thread\n");

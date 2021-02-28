@@ -6,6 +6,7 @@
     "sources": [
       "src/FfmpegProcess.cpp",
       "src/FrameThread.cpp",
+      "src/FrameHeader.cpp",
       "src/main.cpp",
       "src/Native.cpp",
       "src/PipeReader.cpp",
@@ -87,7 +88,7 @@
         },
         'libraries': [
           "opencv_world451.lib",
-		  "Rpcrt4.lib"
+          "Rpcrt4.lib"
         ],
         "copies":[
           {
