@@ -86,7 +86,8 @@
           }
         },
         'libraries': [
-          "opencv_world451.lib"
+          "opencv_world451.lib",
+		  "Rpcrt4.lib"
         ],
         "copies":[
           {

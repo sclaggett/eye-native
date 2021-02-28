@@ -125,16 +125,22 @@ void native::closeVideoOutput(Napi::Env env)
 
 string native::createPreviewChannel(Napi::Env env, string& channelName)
 {
-#ifdef _WIN32
-  // TODO
-  return "";
-#else  
   // Make sure the main thread is running
   if (gFrameThread == nullptr)
   {
     return "Create video output before preview channel";
   }
 
+#ifdef _WIN32
+  // Create a name for the unique pipe
+  UUID pipeId = {0};
+  UuidCreate(&pipeId);
+  RPC_CSTR pipeIdStr = NULL;
+  UuidToString(&pipeId, &pipeIdStr);
+  channelName = "\\\\.\\pipe\\";
+  channelName += (char*)pipeIdStr;
+  RpcStringFree(&pipeIdStr);
+#else
   // Create a temporary file
   char nameBuffer[128];
   snprintf(nameBuffer, 128, "/tmp/eyeNativeXXXXXX");
@@ -152,11 +158,11 @@ string native::createPreviewChannel(Napi::Env env, string& channelName)
   {
     return "Failed to create named pipe";
   }
+#endif
 
   // Pass the preview channel name to the frame thread
   gFrameThread->setPreviewChannel(channelName);
   return "";
-#endif
 }
 
 string native::openPreviewChannel(Napi::Env env, string name)

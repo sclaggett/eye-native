@@ -176,7 +176,8 @@ bool FfmpegProcess::startProcess()
     
   // Create the child process.
   LPSTR cmdLineStr = strdup(commandLine.c_str());
-  if (!CreateProcess(NULL, cmdLineStr, NULL, NULL, TRUE, 0, NULL, NULL, &siStartInfo, &piProcInfo))
+  if (!CreateProcess(NULL, cmdLineStr, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL,
+	&siStartInfo, &piProcInfo))
   {
     free(cmdLineStr);
     printf("ERROR: Failed to create ffmpeg process\n");
