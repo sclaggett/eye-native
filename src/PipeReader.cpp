@@ -1,18 +1,11 @@
 #include "PipeReader.h"
-#ifdef _WIN32
-#else
-  #include <unistd.h>
-#endif
+#include "Platform.h"
 
 using namespace std;
 
-#ifdef _WIN32
-PipeReader::PipeReader(string name, HANDLE f) :
-#else
-PipeReader::PipeReader(string name, int f) :
-#endif
+PipeReader::PipeReader(string name, uint32_t f) :
   Thread(name),
-  fd(f)
+  file(f)
 {
 }
 
@@ -29,57 +22,36 @@ uint32_t PipeReader::run()
   char buffer[1024];
   while (!checkForExit())
   {
-#ifdef _WIN32
-    DWORD dwRead = 0;
-    if (!ReadFile(fd, buffer, 1023, &dwRead, NULL))
+    // Wait for data to become available to read and continue around the loop if nothing
+    // arrives within 100 ms
+    int32_t ret = platform::waitForData(file, 100);
+    if (ret == -1)
     {
       printf("ERROR: Failed to read from pipe\n");
       return 0;
     }
-    if (dwRead == 0)
-    {
-      break;
-    }
-    else
-    {
-      buffer[dwRead] = 0;
-      unique_lock<mutex> lock(dataMutex);
-      data += buffer;
-    }
-#else
-    fd_set set;
-    FD_ZERO(&set);
-    FD_SET(fd, &set);
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 100000;
-    int rv = select(fd + 1, &set, NULL, NULL, &timeout);
-    if (rv == -1)
-    {
-      printf("ERROR: Failed to wait for pipe\n");
-      return 0;
-    }
-    if (rv == 0)
+    else if (ret == 0)
     {
       continue;
     }
-    ssize_t readCount = read(fd, buffer, 1023);
-    if (readCount == -1)
+
+    // Read data from the pipe and append it to the data string
+    ret = platform::read(file, (uint8_t*)&(buffer[0]), 1023);
+    if (ret == -1)
     {
       printf("ERROR: Failed to read from pipe\n");
       return 0;
     }
-    if (readCount == 0)
+    else if (ret == 0)
     {
       break;
     }
-    if (readCount > 0)
+    else if (ret > 0)
     {
-      buffer[readCount] = 0;
+      buffer[ret] = 0;
       unique_lock<mutex> lock(dataMutex);
       data += buffer;
     }
-#endif
   }
   return 0;
 }

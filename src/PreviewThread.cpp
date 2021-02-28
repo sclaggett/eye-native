@@ -1,31 +1,9 @@
 #include "PreviewThread.h"
 #include "FrameHeader.h"
-#ifdef _WIN32
-#else
-  #include <fcntl.h>
-  #include <sys/stat.h>
-  #include <sys/types.h>
-  #include <unistd.h>
-#endif
+#include "Platform.h"
 
 using namespace std;
 using namespace cv;
-
-// This should go in a class that hides the cross-platform messiness
-bool ReadData(int fd, uint8_t* data, uint32_t length)
-{
-  uint32_t bytesRead = 0;
-  while (bytesRead < length)
-  {
-    ssize_t ret = read(fd, data + bytesRead, length - bytesRead);
-    if (ret == -1)
-    {
-      return false;
-    }
-    bytesRead += ret;
-  }
-  return true;
-}
 
 PreviewThread::PreviewThread(string name, shared_ptr<Queue<cv::Mat*>> queue) :
   Thread("preview"),
@@ -38,16 +16,13 @@ uint32_t PreviewThread::run()
 {
   printf("## Starting preview thread\n");
 
-  // Open the named pipe
-#ifdef _WIN32
-#else
-  int namedPipe = open(channelName.c_str(), O_RDONLY);
-  if (namedPipe == -1)
+  // Open the named pipe for reading
+  uint32_t namedPipeId = 0;
+  if (!platform::openNamedPipeForReading(channelName, namedPipeId))
   {
-    printf("## Failed to open named pipe\n");
+    printf("[PreviewThread] Failed to open named pipe\n");
     return 1;
   }
-#endif
 
   uint8_t frameHeader[FRAME_HEADER_SIZE];
   uint8_t* buffer = 0;
@@ -56,7 +31,7 @@ uint32_t PreviewThread::run()
   while (!checkForExit())
   {
     // Read the frame header from the named pipe and extract the fields
-    if (!ReadData(namedPipe, &(frameHeader[0]), FRAME_HEADER_SIZE))
+    if (!readAll(namedPipeId, &(frameHeader[0]), FRAME_HEADER_SIZE))
     {
       printf("[PreviewThread] Failed to read from named pipe\n");
       return 1;
@@ -77,7 +52,7 @@ uint32_t PreviewThread::run()
       bufferSize = length;
       buffer = new uint8_t[bufferSize];
     }
-    if (!ReadData(namedPipe, buffer, length))
+    if (!readAll(namedPipeId, buffer, length))
     {
       printf("[PreviewThread] Failed to read from named pipe\n");
       return 1;
@@ -90,6 +65,22 @@ uint32_t PreviewThread::run()
     previewQueue->addItem(copy);
   }
 
+  platform::closeNamedPipeForReading(namedPipeId);
   printf("## Stopping preview thread\n");
   return 0;
+}
+
+bool PreviewThread::readAll(uint32_t file, uint8_t* buffer, uint32_t length)
+{
+  uint32_t bytesRead = 0;
+  while (bytesRead < length)
+  {
+    int32_t ret = platform::read(file, buffer + bytesRead, length - bytesRead);
+    if (ret == -1)
+    {
+      return false;
+    }
+    bytesRead += (uint32_t)ret;
+  }
+  return true;
 }

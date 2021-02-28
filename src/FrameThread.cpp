@@ -1,35 +1,18 @@
 #include "FrameThread.h"
 #include "FrameHeader.h"
+#include "Platform.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-#ifdef _WIN32
-#else
-  #include <fcntl.h>
-  #include <sys/stat.h>
-  #include <sys/types.h>
-  #include <unistd.h>
-#endif
-
 using namespace std;
 using namespace cv;
 
-// This should go in a class that hides the cross-platform messiness
-bool WriteData(int fd, const uint8_t* data, uint32_t length)
-{
-  uint32_t bytesWritten = 0;
-  while (bytesWritten < length)
-  {
-    ssize_t ret = write(fd, data + bytesWritten, length - bytesWritten);
-    if (ret == -1)
-    {
-      return false;
-    }
-    bytesWritten += ret;
-  }
-  return true;
-}
+// Define constants to keep track of the four states that a named pipe can be in
+#define CHANNEL_CLOSED 0
+#define CHANNEL_OPENING 1
+#define CHANNEL_OPEN 2
+#define CHANNEL_ERROR 3
 
 FrameThread::FrameThread(shared_ptr<FfmpegProcess> process,
     shared_ptr<Queue<FrameWrapper*>> pendingQueue,
@@ -43,21 +26,11 @@ FrameThread::FrameThread(shared_ptr<FfmpegProcess> process,
 {
 }
 
-// Define constants to keep track of the three states of the named pipe
-#define CHANNEL_CLOSED 0
-#define CHANNEL_OPENING 1
-#define CHANNEL_OPEN 2
-#define CHANNEL_ERROR 3
-
 uint32_t FrameThread::run()
 {
   uint32_t frameNumber = 0;
   uint32_t channelState = CHANNEL_CLOSED;
-#ifdef _WIN32
-  HANDLE namedPipe = 0;
-#else
-  int namedPipe = 0;
-#endif
+  uint32_t namedPipeId = 0;
   while (!checkForExit())
   {
     FrameWrapper* wrapper = 0;
@@ -86,86 +59,49 @@ uint32_t FrameThread::run()
       unique_lock<mutex> lock(previewChannelMutex);
       if (!previewChannelName.empty())
       {
-#ifdef _WIN32
-        // Create the named pipe
-        printf("## [FrameThread] Creating named pipe: %s\n", previewChannelName.c_str());
-        namedPipe = CreateNamedPipe(previewChannelName.c_str(), PIPE_ACCESS_OUTBOUND,
-          PIPE_TYPE_BYTE | PIPE_NOWAIT, 1, 0, 0, 0, NULL);
-        if (namedPipe == INVALID_HANDLE_VALUE)
+        bool opening = false;
+        if (!platform::createNamedPipeForWriting(previewChannelName, namedPipeId,
+          opening))
         {
           printf("[FrameThread] Failed to create named pipe\n");
           channelState = CHANNEL_ERROR;
           continue;
         }
-
-        // Set the state to opening while we wait for the remote process to connect
-        printf("## [FrameThread] Pipe created, waiting for renderer process to connect\n");
-        channelState = CHANNEL_OPENING;
-#else
-        // Attempt to create the named pipe in nonblocking mode. This will only succeed
-        // if the remote process has already opened the pipe for reading. We use this
-        // approach so this thread doesn't hang forever waiting on the remote process
-        namedPipe = open(previewChannelName.c_str(), O_WRONLY | O_NONBLOCK);
-        if (namedPipe == -1)
+        if (namedPipeId != 0)
         {
-          // A response of ENXIO is expected and means the other end of the pipe hasn't
-          // been opened for reading, any other error code means something else went wrong
-          if (errno != ENXIO)
-          {
-            printf("[FrameThread] Failed to create named pipe\n");
-            channelState = CHANNEL_ERROR;
-          }
-          continue;
+          channelState = opening ? CHANNEL_OPENING : CHANNEL_OPEN;
         }
-
-        // Switch the named pipe to blocking mode now that the other end is connected
-        int flags = fcntl(namedPipe, F_GETFL, 0);
-        flags &= ~O_NONBLOCK;
-        fcntl(namedPipe, F_SETFL, flags);
-
-        // Skip the opening state and go straight to open
-        channelState = CHANNEL_OPEN;
-#endif
       }
     }
 
     // Check asynchronously if the renderer process has connected to the preview channel
     if (channelState == CHANNEL_OPENING)
     {
-#ifdef _WIN32
-      // Wait for the client to connect
-      ConnectNamedPipe(namedPipe, NULL);
-      DWORD err = GetLastError();
-      if (err == ERROR_PIPE_CONNECTED)
+      bool opened = false;
+      if (!platform::openNamedPipeForWriting(namedPipeId, opened))
+      {
+        printf("[FrameThread] Named pipe connetion failed\n");
+        channelState = CHANNEL_ERROR;
+        continue;
+      }
+      if (opened)
       {
         printf("## [FrameThread] Renderer process has connected\n");
         channelState = CHANNEL_OPEN;
       }
-      else if (err != ERROR_IO_PENDING)
-      {
-        printf("[FrameThread] Named pipe connetion failed: %i\n", err);
-        channelState = CHANNEL_ERROR;
-        continue;
-      }
-#else
-#endif
     }
     
     // Write the frame to the named pipe once the connection is established
     if (channelState == CHANNEL_OPEN)
     {
       string header = frameheader::format(frameNumber, width, height, frameLength);
-#ifdef _WIN32
-#else
-      // Write the frame to the named pipe
-      if (!WriteData(namedPipe, (const uint8_t*)header.data(), header.size()) ||
-        !WriteData(namedPipe, (const uint8_t*)frame.data, frameLength))
+      if (!writeAll(namedPipeId, (const uint8_t*)header.data(), header.size()) ||
+        !writeAll(namedPipeId, (const uint8_t*)frame.data, frameLength))
       {
         printf("[FrameThread] Failed to write frame to pipe\n");
         channelState = CHANNEL_ERROR;
         continue;
       }
-#endif
     }
     
     // Add the frame to the completed queue
@@ -176,14 +112,8 @@ uint32_t FrameThread::run()
   // Close the preview channel
   if (channelState != CHANNEL_CLOSED)
   {
-#ifdef _WIN32
-    CloseHandle(namedPipe);
-#else
-    unlink(previewChannelName.c_str());
-#endif
+    platform::closeNamedPipeForWriting(previewChannelName, namedPipeId);
   }
-  
-
   return 0;
 }
 
@@ -191,4 +121,19 @@ void FrameThread::setPreviewChannel(string channelName)
 {
   unique_lock<mutex> lock(previewChannelMutex);
   previewChannelName = channelName;
+}
+
+bool FrameThread::writeAll(uint32_t file, const uint8_t* buffer, uint32_t length)
+{
+  uint32_t bytesWritten = 0;
+  while (bytesWritten < length)
+  {
+    int32_t ret = platform::write(file, buffer + bytesWritten, length - bytesWritten);
+    if (ret == -1)
+    {
+      return false;
+    }
+    bytesWritten += ret;
+  }
+  return true;
 }

@@ -1,12 +1,7 @@
 #pragma once
 
-#include <condition_variable>
-#include <memory>
 #include <mutex>
 #include <string>
-#ifdef _WIN32
-  #include <Windows.h>
-#endif
 
 class Thread
 {
@@ -28,19 +23,9 @@ public:
   uint32_t runStart();
   virtual uint32_t run() = 0;
 
-#ifdef _WIN32
-  static DWORD runHelper(void* context);
-#else
-  static void* runHelper(void* context);
-#endif
-
 protected:
   std::string threadName;
-#ifdef _WIN32
-  HANDLE threadId = 0;
-#else
-  pthread_t threadId = 0;
-#endif
+  uint64_t threadId = 0;
 
 private:
   bool threadRunning = false;

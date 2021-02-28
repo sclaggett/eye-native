@@ -1,12 +1,13 @@
 #include "Thread.h"
-
-#ifdef _WIN32
-#else
-  #include <unistd.h>
-  #include <sys/syscall.h>
-#endif
+#include "Platform.h"
 
 using namespace std;
+
+// Helper function that bridged from C to C++
+uint32_t runHelper(void* context)
+{
+  return ((Thread*)context)->runStart();
+}
 
 Thread::Thread(string name) :
   threadName(name)
@@ -19,16 +20,7 @@ std::string Thread::spawn()
   {
     return "An instance of the thread is already running";
   }
-  bool success = false;
-#ifdef _WIN32
-  DWORD dwThreadId = 0;
-  threadId = CreateThread(NULL, 0, &Thread::runHelper, this, 0, &dwThreadId);
-  success = (threadId != NULL);
-#else
-  int retVal = pthread_create(&threadId, nullptr, &Thread::runHelper, this);
-  success = (retVal == 0);
-#endif
-  if (!success)
+  if (!platform::spawnThread(runHelper, this, threadId))
   {
     return "Failed to spawn thread";
   }
@@ -56,14 +48,7 @@ std::string Thread::terminate()
   {
     return "";
   }
-  bool success = false;
-#ifdef _WIN32
-  success = TerminateThread(threadId, 1);
-#else
-  int retVal = pthread_cancel(threadId);
-  success = (retVal == 0);
-#endif
-  if (!success)
+  if (!platform::terminateThread(threadId, 1))
   {
     return "Unable to cancel thread";
   }
@@ -105,15 +90,3 @@ uint32_t Thread::runStart()
   signalComplete();
   return retVal;
 }
-
-#ifdef _WIN32
-  DWORD Thread::runHelper(void* context)
-  {
-    return (DWORD)((Thread*)context)->runStart();
-  }
-#else
-  void* Thread::runHelper(void* context)
-  {
-    return reinterpret_cast<void*>(((Thread*)context)->runStart());
-  }
-#endif

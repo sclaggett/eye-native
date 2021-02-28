@@ -1,17 +1,12 @@
 #include "Native.h"
 #include "FfmpegProcess.h"
 #include "FrameThread.h"
+#include "Platform.h"
 #include "PreviewThread.h"
 #include "Wrapper.h"
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <stdio.h>
-#ifdef _WIN32
-#else
-  #include <sys/stat.h>
-  #include <sys/types.h>
-  #include <unistd.h>
-#endif
 
 using namespace std;
 using namespace cv;
@@ -131,36 +126,11 @@ string native::createPreviewChannel(Napi::Env env, string& channelName)
     return "Create video output before preview channel";
   }
 
-#ifdef _WIN32
-  // Create a name for the unique pipe
-  UUID pipeId = {0};
-  UuidCreate(&pipeId);
-  RPC_CSTR pipeIdStr = NULL;
-  UuidToString(&pipeId, &pipeIdStr);
-  channelName = "\\\\.\\pipe\\";
-  channelName += (char*)pipeIdStr;
-  RpcStringFree(&pipeIdStr);
-#else
-  // Create a temporary file
-  char nameBuffer[128];
-  snprintf(nameBuffer, 128, "/tmp/eyeNativeXXXXXX");
-  int tmpFd = mkstemp(nameBuffer);
-  if (tmpFd == -1)
+  // Generate a unique pipe name and pass it to the frame thread
+  if (!platform::generateUniquePipeName(channelName))
   {
-    return "Failed to create temporary file";
+    return "Failed to create uniquely named pipe";
   }
-
-  // Append ".fifo" to the temporary file's name to make it unique and create a
-  // named pipe
-  channelName = string(nameBuffer) + ".fifo";
-  if (mkfifo(channelName.c_str(), S_IRUSR | S_IWUSR | S_IWGRP | S_IXGRP | 
-    S_IROTH | S_IWOTH) != 0)
-  {
-    return "Failed to create named pipe";
-  }
-#endif
-
-  // Pass the preview channel name to the frame thread
   gFrameThread->setPreviewChannel(channelName);
   return "";
 }

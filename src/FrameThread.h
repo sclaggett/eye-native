@@ -26,6 +26,9 @@ public:
 
   void setPreviewChannel(std::string channelName);
 
+protected:
+  bool writeAll(uint32_t file, const uint8_t* buffer, uint32_t length);
+
 private:
   std::shared_ptr<FfmpegProcess> ffmpegProcess;
   std::shared_ptr<Queue<FrameWrapper*>> pendingFrameQueue;

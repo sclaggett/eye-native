@@ -36,17 +36,10 @@ private:
   bool processStarted = false;
   std::mutex processMutex;
   std::condition_variable processStartEvent;
-#ifdef _WIN32
-  HANDLE processPid = NULL;
-  HANDLE processStdin = NULL;
-  HANDLE processStdout = NULL;
-  HANDLE processStderr = NULL;
-#else
-  int processPid = 0;
-  int processStdin = 0;
-  int processStdout = 0;
-  int processStderr = 0;
-#endif
+  uint32_t processPid = 0;
+  uint32_t processStdin = 0;
+  uint32_t processStdout = 0;
+  uint32_t processStderr = 0;
   std::shared_ptr<PipeReader> stdoutReader;
   std::shared_ptr<PipeReader> stderrReader;
 };

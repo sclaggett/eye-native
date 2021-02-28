@@ -27,6 +27,9 @@
         'library_dirs': []
       }],
       ['OS=="mac"', {
+        "sources": [
+          "src/Platform_Mac.cpp"
+        ],
         'product_dir': 'build/Release/',
         'include_dirs': [
           "opencv/mac/include/"
@@ -74,6 +77,9 @@
         ]
       }],
       ['OS=="win"', {
+        "sources": [
+          "src/Platform_Win.cpp"
+        ],
         'include_dirs': [
           "opencv/win/include/"
         ],

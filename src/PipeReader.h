@@ -8,11 +8,7 @@
 class PipeReader : public Thread
 {
 public:
-#ifdef _WIN32
-  PipeReader(std::string name, HANDLE fd);
-#else
-  PipeReader(std::string name, int fd);
-#endif
+  PipeReader(std::string name, uint32_t file);
   virtual ~PipeReader() {};
 
 public:
@@ -20,11 +16,7 @@ public:
   uint32_t run();
 
 private:
-#ifdef _WIN32
-  HANDLE fd = NULL;
-#else
-  int fd = 0;
-#endif
+  uint32_t file = 0;
   std::string data;
   std::mutex dataMutex;
 };
