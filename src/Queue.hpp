@@ -14,13 +14,11 @@ public:
 public:
   void addItem(T item);
   bool waitItem(T* item, int timeout);
+  std::vector<T> waitAllItems(int timeout);
 
   int size();
   bool empty();
   void clear();
-
-protected:
-  void notify();
 
 protected:
   std::queue<T> itemQueue;
@@ -31,34 +29,53 @@ protected:
 template <typename T>
 void Queue<T>::addItem(T item)
 {
-  std::unique_lock<std::mutex> lock(queueMutex);
-  itemQueue.push(item);
-  notify();
+  {
+    std::unique_lock<std::mutex> lock(queueMutex);
+    itemQueue.push(item);
+  }
+  queueEvent.notify_all();
 }
 
 template <typename T>
 bool Queue<T>::waitItem(T* item, int timeout)
 {
-  std::unique_lock<std::mutex> lock(this->queueMutex);
-  if (this->itemQueue.empty() && (timeout > 0))
+  std::unique_lock<std::mutex> lock(queueMutex);
+  if (itemQueue.empty() && (timeout > 0))
   {
     queueEvent.wait_for(lock, std::chrono::milliseconds(timeout));
   }
-  if (this->itemQueue.empty())
+  if (itemQueue.empty())
   {
     return false;
   }
-  *item = this->itemQueue.front();
-  this->itemQueue.pop();
+  *item = itemQueue.front();
+  itemQueue.pop();
   return true;
+}
+
+template <typename T>
+std::vector<T> Queue<T>::waitAllItems(int timeout)
+{
+  std::unique_lock<std::mutex> lock(queueMutex);
+  if (itemQueue.empty() && (timeout > 0))
+  {
+    queueEvent.wait_for(lock, std::chrono::milliseconds(timeout));
+  }
+  std::vector<T> allItems;
+  while (!itemQueue.empty())
+  {
+    T item = itemQueue.front();
+    itemQueue.pop();
+    allItems.push_back(item);
+  }
+  return allItems;
 }
 
 template <typename T>
 int Queue<T>::size()
 {
   std::unique_lock<std::mutex> lock(queueMutex);
-  int size = itemQueue.size();
-  return size;
+  return itemQueue.size();
 }
 
 template <typename T>
@@ -75,10 +92,4 @@ void Queue<T>::clear()
   {
     itemQueue.pop();
   }
-}
-
-template <typename T>
-void Queue<T>::notify()
-{
-  queueEvent.notify_one();
 }

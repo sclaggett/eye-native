@@ -50,7 +50,12 @@ You can shorten your iteration time when developing this library in the context 
 1. Check out eye-candy and eye-native repositories in sibling directories.
 2. Modify eye-candy's `app/package.json` to change the eye-native dependency from `sclaggett/eye-native.git` to `../../eye-native`.
 3. Make your changes in eye-native and run `yarn build` to confirm they compile.
-4. Force eye-candy to pick up the changes by running `cd app` and `yarn upgrade eye-native`.
+4. Force eye-candy to pick up the changes by running the following commands:
+
+```sh
+$ cd app && rm -rf node_modules/eye-native && yarn install --check-files && cd ..
+$ yarn dev
+```
 
 ## Windows development
 
