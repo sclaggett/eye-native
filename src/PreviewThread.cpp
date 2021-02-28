@@ -22,9 +22,9 @@ uint32_t PreviewThread::run()
   while (!checkForExit())
   {
 #ifdef _WIN32
-    Sleep(10);
+    Sleep(30);
 #else
-    usleep(10 * 1000);
+    usleep(30 * 1000);
 #endif
 
     // Read the following from the named pipe:
@@ -44,9 +44,10 @@ uint32_t PreviewThread::run()
     {
       for (uint32_t x = 0; x < width; ++x)
       {
-        *(data + offset++) = temp % 255; // B
-        *(data + offset++) = (temp + 64) % 255; // G
-        *(data + offset++) = (temp + 128 % 255); // R
+        uint32_t clr = temp % 255;
+        *(data + offset++) = clr; // B
+        *(data + offset++) = clr; // G
+        *(data + offset++) = clr; // R
         *(data + offset++) = 255; // A
       }
     }

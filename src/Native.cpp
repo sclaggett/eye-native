@@ -171,11 +171,20 @@ string native::openPreviewChannel(Napi::Env env, string name)
 bool native::getNextFrame(Napi::Env env, uint8_t*& frame, size_t& length,
   int maxWidth, int maxHeight)
 {
-  // Get the next preview frame and return if none are available
-  Mat* previewFrame = 0;
-  if (!gPreviewFrameQueue->waitItem(&previewFrame, 0))
+  // Get all preview frames in the queue and discarding everything except the most
+  // recent frame. Return false if no frames are available
+  vector<Mat*> allFrames = gPreviewFrameQueue->waitAllItems(0);
+  if (allFrames.size() == 0)
   {
     return false;
+  }
+  Mat* previewFrame = allFrames[allFrames.size() - 1];
+  uint32_t discardCount = 0;
+  for (uint32_t i = 0; i < (allFrames.size() - 1); ++i)
+  {
+    Mat* tempFrame = allFrames[i];
+    delete tempFrame;
+    discardCount += 1;
   }
 
   // Use the standard approach to calculate the scaled size of the preview frame
@@ -195,12 +204,10 @@ bool native::getNextFrame(Napi::Env env, uint8_t*& frame, size_t& length,
       (double)previewFrame->rows);
   }
 
-  printf("## GetNextFrame, frame = (%i, %i), max = (%i, %i), resized = (%i, %i)\n",
-    previewFrame->cols, previewFrame->rows, maxWidth, maxHeight, width, height);
-
   // Resize the preview frame and export it in the PNG format
   Mat resizedFrame;
-  resize(*previewFrame, resizedFrame, Size2i(width, height), 0, 0, INTER_AREA);
+  resize(*previewFrame, resizedFrame, Size2i(width, height), 0, 0,
+    INTER_LINEAR);
   vector<uchar> pngFrame;
   imencode(".png", resizedFrame, pngFrame);
 
