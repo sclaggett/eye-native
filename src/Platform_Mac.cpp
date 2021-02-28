@@ -20,7 +20,7 @@ void platform::sleep(uint32_t timeMs)
 }
 
 bool platform::spawnProcess(string executable, vector<string> arguments,
-  uint32_t& pid, uint32_t& stdIn, uint32_t& stdOut, uint32_t& stdErr)
+  uint64_t& pid, uint64_t& stdIn, uint64_t& stdOut, uint64_t& stdErr)
 {
   vector<string> environment;
   char** env = *_NSGetEnviron();
@@ -74,10 +74,10 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   }
   else if (forkResult > 0)
   {
-    pid = (uint32_t)forkResult;
-    stdIn = (uint32_t)stdinPipe[PIPE_WRITE];
-    stdOut = (uint32_t)stdoutPipe[PIPE_READ];
-    stdErr = (uint32_t)stderrPipe[PIPE_READ];
+    pid = (uint64_t)forkResult;
+    stdIn = (uint64_t)stdinPipe[PIPE_WRITE];
+    stdOut = (uint64_t)stdoutPipe[PIPE_READ];
+    stdErr = (uint64_t)stderrPipe[PIPE_READ];
     close(stdinPipe[PIPE_READ]); 
     close(stdoutPipe[PIPE_WRITE]); 
     close(stderrPipe[PIPE_WRITE]);
@@ -96,7 +96,7 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   }
 }
 
-bool platform::isProcessRunning(uint32_t pid)
+bool platform::isProcessRunning(uint64_t pid)
 {
   int status;
   int res = waitpid((int)pid, &status, WNOHANG);
@@ -119,7 +119,7 @@ bool platform::isProcessRunning(uint32_t pid)
   }
 }
 
-bool platform::terminateProcess(uint32_t pid, uint32_t exitCode)
+bool platform::terminateProcess(uint64_t pid, uint32_t exitCode)
 {
   return (kill((int)pid, SIGKILL) == 0);
 }
@@ -169,7 +169,7 @@ bool platform::generateUniquePipeName(string& channelName)
     S_IROTH | S_IWOTH) == 0);
 }
 
-bool platform::createNamedPipeForWriting(string channelName, uint32_t& pipeId,
+bool platform::createNamedPipeForWriting(string channelName, uint64_t& pipeId,
   bool& opening)
 {
   // Attempt to create the named pipe in nonblocking mode. This will only succeed
@@ -197,40 +197,40 @@ bool platform::createNamedPipeForWriting(string channelName, uint32_t& pipeId,
   fcntl(pipe, F_SETFL, flags);
 
   // Skip the opening state and go straight to open
-  pipeId = (uint32_t)pipe;
+  pipeId = (uint64_t)pipe;
   opening = false;
   return true;
 }
 
-bool platform::openNamedPipeForWriting(uint32_t pipeId, bool& opened)
+bool platform::openNamedPipeForWriting(uint64_t pipeId, bool& opened)
 {
   // This shouldn't be called on Mac
   return false;
 }
 
-void platform::closeNamedPipeForWriting(string channelName, uint32_t pipeId)
+void platform::closeNamedPipeForWriting(string channelName, uint64_t pipeId)
 {
   ::close((int)pipeId);
   unlink(channelName.c_str());
 }
 
-bool platform::openNamedPipeForReading(string channelName, uint32_t& pipeId)
+bool platform::openNamedPipeForReading(string channelName, uint64_t& pipeId)
 {
   int ret = open(channelName.c_str(), O_RDONLY);
   if (ret == -1)
   {
     return false;
   }
-  pipeId = (uint32_t)ret;
+  pipeId = (uint64_t)ret;
   return true;
 }
 
-void platform::closeNamedPipeForReading(uint32_t pipeId)
+void platform::closeNamedPipeForReading(uint64_t pipeId)
 {
   ::close((int)pipeId);
 }
 
-int32_t platform::waitForData(uint32_t file, uint32_t timeoutMs)
+int32_t platform::waitForData(uint64_t file, uint32_t timeoutMs)
 {
   fd_set set;
   FD_ZERO(&set);
@@ -241,17 +241,17 @@ int32_t platform::waitForData(uint32_t file, uint32_t timeoutMs)
   return select(file + 1, &set, NULL, NULL, &timeout);
 }
 
-int32_t platform::read(uint32_t file, uint8_t* buffer, uint32_t maxLength)
+int32_t platform::read(uint64_t file, uint8_t* buffer, uint32_t maxLength)
 {
   return ::read((int)file, buffer, maxLength);
 }
 
-int32_t platform::write(uint32_t file, const uint8_t* buffer, uint32_t length)
+int32_t platform::write(uint64_t file, const uint8_t* buffer, uint32_t length)
 {
   return ::write((int)file, buffer, length);
 }
 
-void platform::close(uint32_t file)
+void platform::close(uint64_t file)
 {
   ::close((int)file);
 }
