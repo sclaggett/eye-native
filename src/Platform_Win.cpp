@@ -9,7 +9,7 @@ void platform::sleep(uint32_t timeMs)
 }
 
 bool platform::spawnProcess(string executable, vector<string> arguments,
-  uint32_t& pid, uint32_t& stdin, uint32_t& stdout, uint32_t& stderr)
+  uint64_t& pid, uint64_t& stdIn, uint64_t& stdOut, uint64_t& stdErr)
 {
   // Set the bInheritHandle flag so pipe handles are inherited.
   SECURITY_ATTRIBUTES saAttr;
@@ -78,7 +78,7 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   // Create the child process.
   LPSTR cmdLineStr = strdup(commandLine.c_str());
   if (!CreateProcess(NULL, cmdLineStr, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL,
-  &siStartInfo, &piProcInfo))
+    &siStartInfo, &piProcInfo))
   {
     free(cmdLineStr);
     printf("ERROR: Failed to create ffmpeg process\n");
@@ -94,14 +94,14 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   CloseHandle(childStdinRd);
   
   // Remember the handles.
-  pid = (uint32_t)piProcInfo.hProcess;
-  stdin = (uint32_t)childStdinWr;
-  stdout = (uint32_t)childStdoutRd;
-  stderr = (uint32_t)childStderrRd;
+  pid = (uint64_t)piProcInfo.hProcess;
+  stdIn = (uint64_t)childStdinWr;
+  stdOut = (uint64_t)childStdoutRd;
+  stdErr = (uint64_t)childStderrRd;
   return true;
 }
 
-bool platform::isProcessRunning(uint32_t pid)
+bool platform::isProcessRunning(uint64_t pid)
 {
   DWORD exitCode = 0;
   if (!GetExitCodeProcess((HANDLE)pid, &exitCode))
@@ -112,7 +112,7 @@ bool platform::isProcessRunning(uint32_t pid)
   return (exitCode == STILL_ACTIVE);
 }
 
-bool platform::terminateProcess(uint32_t pid, uint32_t exitCode)
+bool platform::terminateProcess(uint64_t pid, uint32_t exitCode)
 {
   return TerminateProcess((HANDLE)pid, exitCode);
 }
@@ -129,19 +129,19 @@ DWORD runHelperWin(void* context)
   delete runContext;
   return (DWORD)ret;
 }
-bool platform::spawnThread(runFunction func, void* context, uint32_t& threadId)
+bool platform::spawnThread(runFunction func, void* context, uint64_t& threadId)
 {
   RUN_CONTEXT* runContext = new RUN_CONTEXT;
   runContext->func = func;
   runContext->context = context;
   DWORD dwThreadId = 0;
-  threadId = CreateThread(NULL, 0, &runHelperWin, runContext, 0, &dwThreadId);
+  threadId = (uint64_t)CreateThread(NULL, 0, &runHelperWin, runContext, 0, &dwThreadId);
   return (threadId == 0);
 }
 
-bool platform::terminateThread(uint32_t threadId, uint32_t exitCode)
+bool platform::terminateThread(uint64_t threadId, uint32_t exitCode)
 {
-  return TerminateThread(threadId, 1);
+  return TerminateThread((HANDLE)threadId, 1);
 }
 
 bool platform::generateUniquePipeName(string& channelName)
@@ -157,7 +157,7 @@ bool platform::generateUniquePipeName(string& channelName)
   return true;
 }
 
-bool platform::createNamedPipeForWriting(string channelName, uint32_t& pipeId,
+bool platform::createNamedPipeForWriting(string channelName, uint64_t& pipeId,
   bool& opening)
 {
   // Create the named pipe
@@ -167,14 +167,14 @@ bool platform::createNamedPipeForWriting(string channelName, uint32_t& pipeId,
   {
     return false;
   }
-  pipeId = (uint32_t)pipe;
+  pipeId = (uint64_t)pipe;
 
   // Set the opening flag because we're waiting for the remote process to connect
   opening = true;
   return true;
 }
 
-bool platform::openNamedPipeForWriting(uint32_t pipeId, bool& opened)
+bool platform::openNamedPipeForWriting(uint64_t pipeId, bool& opened)
 {
   // Wait for the client to connect
   ConnectNamedPipe((HANDLE)pipeId, NULL);
@@ -195,38 +195,38 @@ bool platform::openNamedPipeForWriting(uint32_t pipeId, bool& opened)
   }
 }
 
-void platform::closeNamedPipeForWriting(string channelName, uint32_t pipeId)
+void platform::closeNamedPipeForWriting(string channelName, uint64_t pipeId)
 {
   CloseHandle((HANDLE)pipeId);
 }
 
-bool platform::openNamedPipeForReading(string channelName, uint32_t& pipeId)
+bool platform::openNamedPipeForReading(string channelName, uint64_t& pipeId)
 {
-
+  return false;
 }
 
-void platform::closeNamedPipeForReading(uint32_t pipeId)
+void platform::closeNamedPipeForReading(uint64_t pipeId)
 {
   
 }
 
-int32_t platform::waitForData(uint32_t file, uint32_t timeoutMs)
+int32_t platform::waitForData(uint64_t file, uint32_t timeoutMs)
 {
   // This is currently not implemented for Windows
   return (int32_t)file;
 }
 
-int32_t platform::read(uint32_t file, uint8_t* buffer, uint32_t maxLength)
+int32_t platform::read(uint64_t file, uint8_t* buffer, uint32_t maxLength)
 {
   DWORD dwRead = 0;
-  if (!ReadFile(fd, buffer, 1023, &dwRead, NULL))
+  if (!ReadFile((HANDLE)file, buffer, 1023, &dwRead, NULL))
   {
     return -1;
   }
   return (int32_t)dwRead;
 }
 
-int32_t platform::write(uint32_t file, const uint8_t* buffer, uint32_t length)
+int32_t platform::write(uint64_t file, const uint8_t* buffer, uint32_t length)
 {
   DWORD dwWritten = 0;
   if (!WriteFile((HANDLE)file, buffer, length, &dwWritten, NULL))
@@ -236,7 +236,7 @@ int32_t platform::write(uint32_t file, const uint8_t* buffer, uint32_t length)
   return dwWritten;
 }
 
-void platform::close(uint32_t file)
+void platform::close(uint64_t file)
 {
   CloseHandle((HANDLE)file);
 }

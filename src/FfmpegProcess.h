@@ -36,10 +36,10 @@ private:
   bool processStarted = false;
   std::mutex processMutex;
   std::condition_variable processStartEvent;
-  uint32_t processPid = 0;
-  uint32_t processStdin = 0;
-  uint32_t processStdout = 0;
-  uint32_t processStderr = 0;
+  uint64_t processPid = 0;
+  uint64_t processStdin = 0;
+  uint64_t processStdout = 0;
+  uint64_t processStderr = 0;
   std::shared_ptr<PipeReader> stdoutReader;
   std::shared_ptr<PipeReader> stderrReader;
 };

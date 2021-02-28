@@ -20,7 +20,7 @@ void platform::sleep(uint32_t timeMs)
 }
 
 bool platform::spawnProcess(string executable, vector<string> arguments,
-  uint32_t& pid, uint32_t& stdin, uint32_t& stdout, uint32_t& stderr)
+  uint32_t& pid, uint32_t& stdIn, uint32_t& stdOut, uint32_t& stdErr)
 {
   vector<string> environment;
   char** env = *_NSGetEnviron();
@@ -75,9 +75,9 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   else if (forkResult > 0)
   {
     pid = (uint32_t)forkResult;
-    stdin = (uint32_t)stdinPipe[PIPE_WRITE];
-    stdout = (uint32_t)stdoutPipe[PIPE_READ];
-    stderr = (uint32_t)stderrPipe[PIPE_READ];
+    stdIn = (uint32_t)stdinPipe[PIPE_WRITE];
+    stdOut = (uint32_t)stdoutPipe[PIPE_READ];
+    stdErr = (uint32_t)stderrPipe[PIPE_READ];
     close(stdinPipe[PIPE_READ]); 
     close(stdoutPipe[PIPE_WRITE]); 
     close(stderrPipe[PIPE_WRITE]);

@@ -30,7 +30,7 @@ uint32_t FrameThread::run()
 {
   uint32_t frameNumber = 0;
   uint32_t channelState = CHANNEL_CLOSED;
-  uint32_t namedPipeId = 0;
+  uint64_t namedPipeId = 0;
   while (!checkForExit())
   {
     FrameWrapper* wrapper = 0;
@@ -123,7 +123,7 @@ void FrameThread::setPreviewChannel(string channelName)
   previewChannelName = channelName;
 }
 
-bool FrameThread::writeAll(uint32_t file, const uint8_t* buffer, uint32_t length)
+bool FrameThread::writeAll(uint64_t file, const uint8_t* buffer, uint32_t length)
 {
   uint32_t bytesWritten = 0;
   while (bytesWritten < length)

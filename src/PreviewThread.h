@@ -14,7 +14,7 @@ public:
   uint32_t run();
 
 protected:
-  bool readAll(uint32_t file, uint8_t* buffer, uint32_t length);
+  bool readAll(uint64_t file, uint8_t* buffer, uint32_t length);
 
 private:
   std::string channelName;

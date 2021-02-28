@@ -17,7 +17,7 @@ uint32_t PreviewThread::run()
   printf("## Starting preview thread\n");
 
   // Open the named pipe for reading
-  uint32_t namedPipeId = 0;
+  uint64_t namedPipeId = 0;
   if (!platform::openNamedPipeForReading(channelName, namedPipeId))
   {
     printf("[PreviewThread] Failed to open named pipe\n");
@@ -70,7 +70,7 @@ uint32_t PreviewThread::run()
   return 0;
 }
 
-bool PreviewThread::readAll(uint32_t file, uint8_t* buffer, uint32_t length)
+bool PreviewThread::readAll(uint64_t file, uint8_t* buffer, uint32_t length)
 {
   uint32_t bytesRead = 0;
   while (bytesRead < length)
