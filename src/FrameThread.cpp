@@ -28,6 +28,8 @@ FrameThread::FrameThread(shared_ptr<FfmpegProcess> process,
 
 uint32_t FrameThread::run()
 {
+  printf("[FrameThread] ## Thread starting\n");
+  
   uint32_t frameNumber = 0;
   uint32_t channelState = CHANNEL_CLOSED;
   uint64_t namedPipeId = 0;
@@ -38,6 +40,8 @@ uint32_t FrameThread::run()
     {
       continue;
     }
+
+    printf("[FrameThread] ## Got frame\n");
 
     // Frames captured by the Electron framework are encoded in the BGRA colorspace and
     // may be larger than size of the stimulus window.
@@ -51,7 +55,11 @@ uint32_t FrameThread::run()
 
     // Write the raw frame to the ffmpeg process
     uint32_t frameLength = frame.total() * frame.elemSize();
-    ffmpegProcess->writeStdin(frame.data, frameLength);
+    if (!ffmpegProcess->writeStdin(frame.data, frameLength))
+    {
+      printf("[FrameThread] Failed to write to FFmpeg process\n");
+	  break;
+    }
 
     // Create the preview channel
     if (channelState == CHANNEL_CLOSED)

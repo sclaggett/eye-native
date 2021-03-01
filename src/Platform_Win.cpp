@@ -160,6 +160,8 @@ bool platform::generateUniquePipeName(string& channelName)
 bool platform::createNamedPipeForWriting(string channelName, uint64_t& pipeId,
   bool& opening)
 {
+  printf("Attempting to create named pipe for writing %s\n", channelName.c_str());
+  
   // Create the named pipe
   HANDLE pipe = CreateNamedPipe(channelName.c_str(), PIPE_ACCESS_OUTBOUND,
     PIPE_TYPE_BYTE | PIPE_NOWAIT, 1, 0, 0, 0, NULL);
@@ -171,26 +173,31 @@ bool platform::createNamedPipeForWriting(string channelName, uint64_t& pipeId,
 
   // Set the opening flag because we're waiting for the remote process to connect
   opening = true;
+  printf("Named pipe created, waiting for connection\n");
   return true;
 }
 
 bool platform::openNamedPipeForWriting(uint64_t pipeId, bool& opened)
 {
   // Wait for the client to connect
+  printf("Checking for named pipe connection\n");
   ConnectNamedPipe((HANDLE)pipeId, NULL);
   DWORD err = GetLastError();
   if (err == ERROR_PIPE_CONNECTED)
   {
     opened = true;
+    printf("Connection established\n");
     return true;
   }
   else if (err == ERROR_IO_PENDING)
   {
     opened = false;
+    printf("No connection yet\n");
     return true;
   }
   else
   {
+    printf("Something went wrong\n");
     return false;
   }
 }

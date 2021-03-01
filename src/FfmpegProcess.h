@@ -18,7 +18,7 @@ public:
   bool isProcessRunning();
   void waitForExit();
 
-  void writeStdin(uint8_t* data, uint32_t length);
+  bool writeStdin(uint8_t* data, uint32_t length);
   std::string readStdout();
   std::string readStderr();
 

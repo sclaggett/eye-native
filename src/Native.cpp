@@ -59,6 +59,9 @@ string native::createVideoOutput(Napi::Env env, int width, int height, int fps, 
 int32_t native::queueNextFrame(Napi::Env env, uint8_t* frame, size_t length, int width,
   int height)
 {
+  printf("## queueNextFrame()\n");
+  fflush(stdout);
+
   // Make sure we've been initialized and are recording
   if (!gInitialized)
   {
@@ -82,6 +85,9 @@ int32_t native::queueNextFrame(Napi::Env env, uint8_t* frame, size_t length, int
 
 vector<int32_t> native::checkCompletedFrames(Napi::Env env)
 {
+  printf("## checkCompletedFrames()\n");
+  fflush(stdout);
+
   // Return an array of all frames that we're done with and free the associated memory
   vector<int32_t> ret;
   FrameWrapper* wrapper;

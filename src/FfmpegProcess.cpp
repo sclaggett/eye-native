@@ -70,7 +70,7 @@ uint32_t FfmpegProcess::run()
     if (!stdoutReader->isRunning() ||
       !stderrReader->isRunning())
     {
-      printf("ERROR: A process thread has exited unexpectedly\n");
+      printf("[FfmpegProcess] A process thread has exited unexpectedly\n");
       break;
     }
     if (checkForExit())
@@ -85,8 +85,8 @@ uint32_t FfmpegProcess::run()
 
   // TODO: Iteratively print the output in the loop above
   printf("## Ffmpeg process has exited\n");
-  printf("## Stdout: %s\n", stdoutReader->getData().c_str());
-  printf("## Stderr: %s\n", stderrReader->getData().c_str());
+  printf("## Stdout: '%s'\n", stdoutReader->getData().c_str());
+  printf("## Stderr: '%s'\n", stderrReader->getData().c_str());
   cleanUpProcess();
   return 0;
 }
@@ -120,18 +120,14 @@ void FfmpegProcess::waitForExit()
   }
 }
 
-void FfmpegProcess::writeStdin(uint8_t* data, uint32_t length)
+bool FfmpegProcess::writeStdin(uint8_t* data, uint32_t length)
 {
   if (processStdin == 0)
   {
-    printf("ERROR: Stdin has been closed\n");
-    return;
+    return false;
   }
   int bytesWritten = platform::write(processStdin, data, length);
-  if ((bytesWritten < 0) || ((uint32_t)bytesWritten != length))
-  {
-    printf("ERROR: Failed to write to process stdin\n");
-  }
+  return ((bytesWritten > 0) && ((uint32_t)bytesWritten == length));
 }
 
 string FfmpegProcess::readStdout()
